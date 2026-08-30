@@ -1,0 +1,21 @@
+{
+  "features": [
+    "utilization",
+    "throughput",
+    "delay",
+    "packet_loss",
+    "queue_occupancy",
+    "active_flows",
+    "util_lag_1",
+    "util_lag_2",
+    "util_lag_3",
+    "util_lag_5",
+    "util_lag_10",
+    "util_ma_5s",
+    "util_ma_10s",
+    "util_slope"
+  ],
+  "target": "target_util",
+  "horizon_seconds": 5,
+  "engine": "sklearn_gbdt"
+}
