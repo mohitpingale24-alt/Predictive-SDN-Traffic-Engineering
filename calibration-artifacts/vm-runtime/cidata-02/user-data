@@ -1,0 +1,49 @@
+#cloud-config
+users:
+  - default
+  - name: mohit
+    groups: [adm, sudo]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
+    plain_text_passwd: mohit
+write_files:
+  - path: /usr/local/sbin/run-sdn-calibration-02
+    owner: root:root
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -u
+      mkdir -p /mnt/repo /mnt/output
+      mountpoint -q /mnt/repo || mount -t 9p -o trans=virtio,version=9p2000.L repo /mnt/repo
+      mountpoint -q /mnt/output || mount -t 9p -o trans=virtio,version=9p2000.L output /mnt/output
+      exec > >(tee /mnt/output/calibration-02-vm-run.log) 2>&1
+      echo "RUNNING $(date --iso-8601=seconds)" | tee /mnt/output/calibration-02-vm-status.txt
+      systemctl enable --now openvswitch-switch
+      export PATH="/home/mohit/sdn-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      export PYTHONDONTWRITEBYTECODE=1
+      ryu-manager --version
+      mn -c
+      if [ -e /mnt/output/sdn-calibration-02 ]; then
+        echo "FAIL output already exists $(date --iso-8601=seconds)" | tee /mnt/output/calibration-02-vm-status.txt
+        poweroff
+        exit 2
+      fi
+      cd /mnt/repo
+      if ./experiments/collect_calibration.sh /tmp/sdn-calibration-02; then
+        mkdir /mnt/output/sdn-calibration-02
+        cp -R /tmp/sdn-calibration-02/. /mnt/output/sdn-calibration-02/
+        echo "COMPLETE $(date --iso-8601=seconds)" | tee /mnt/output/calibration-02-vm-status.txt
+      else
+        rc=$?
+        if [ -d /tmp/sdn-calibration-02 ]; then
+          mkdir /mnt/output/sdn-calibration-02.failed
+          cp -R /tmp/sdn-calibration-02/. /mnt/output/sdn-calibration-02.failed/
+        fi
+        echo "FAIL rc=$rc $(date --iso-8601=seconds)" | tee /mnt/output/calibration-02-vm-status.txt
+      fi
+      sync
+      poweroff
+runcmd:
+  - [bash, -lc, '/usr/local/sbin/run-sdn-calibration-02']
+final_message: "SDN calibration-02 cloud-init finished"

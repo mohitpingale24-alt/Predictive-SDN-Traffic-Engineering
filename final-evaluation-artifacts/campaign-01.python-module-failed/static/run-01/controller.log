@@ -1,0 +1,6 @@
+loading app /mnt/repo/path_switch_controller.py
+loading app ryu.controller.ofp_handler
+instantiating app /mnt/repo/path_switch_controller.py of PathSwitchController
+Control mode=static model=persistence configured=persistence horizon=5s telemetry=/tmp/sdn-final-campaign/static/run-01/telemetry.csv
+OpenFlow port stats do not expose delay; live telemetry records a zero placeholder that audited dataset preparation replaces with measured ping RTT.
+instantiating app ryu.controller.ofp_handler of OFPHandler

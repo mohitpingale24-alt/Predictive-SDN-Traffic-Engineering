@@ -1,0 +1,18 @@
+timestamp,event,control_mode,old_path,new_path,signal_a,signal_b,reason
+1788328175.25573,controller_start,reactive,,A,,,development default uses persistence unless SDN_ACTIVE_MODEL is set
+1788328219.644511,reroute,reactive,A,B,92.593,46.296499999999995,reactive projected policy A=92.59% B=46.30%
+1788328259.919277,reroute,reactive,B,A,51.46200000000001,25.731,reactive projected policy A=51.46% B=25.73%
+1788328311.2437792,reroute,reactive,A,B,92.607,46.3035,reactive projected policy A=92.61% B=46.30%
+1788328351.4787729,reroute,reactive,B,A,51.61399999999999,25.807,reactive projected policy A=51.61% B=25.81%
+1788328402.847018,reroute,reactive,A,B,92.712,46.356,reactive projected policy A=92.71% B=46.36%
+1788328443.1230159,reroute,reactive,B,A,51.653999999999996,25.827,reactive projected policy A=51.65% B=25.83%
+1788328494.4849741,reroute,reactive,A,B,92.437,46.2185,reactive projected policy A=92.44% B=46.22%
+1788328534.7153542,reroute,reactive,B,A,51.396,25.698,reactive projected policy A=51.40% B=25.70%
+1788328587.156969,reroute,reactive,A,B,92.775,46.387499999999996,reactive projected policy A=92.78% B=46.39%
+1788328626.427242,reroute,reactive,B,A,51.408,25.704,reactive projected policy A=51.41% B=25.70%
+1788328678.832638,reroute,reactive,A,B,92.664,46.33200000000001,reactive projected policy A=92.66% B=46.33%
+1788328718.0899782,reroute,reactive,B,A,51.404,25.702,reactive projected policy A=51.40% B=25.70%
+1788328770.475171,reroute,reactive,A,B,92.551,46.2755,reactive projected policy A=92.55% B=46.28%
+1788328810.7273269,reroute,reactive,B,A,51.49399999999999,25.747,reactive projected policy A=51.49% B=25.75%
+1788328862.168122,reroute,reactive,A,B,92.731,46.3655,reactive projected policy A=92.73% B=46.37%
+1788328902.446777,reroute,reactive,B,A,51.43,25.715,reactive projected policy A=51.43% B=25.71%

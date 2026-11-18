@@ -1,0 +1,39 @@
+#cloud-config
+users:
+  - default
+  - name: mohit
+    groups: [adm, sudo]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
+    plain_text_passwd: mohit
+write_files:
+  - path: /usr/local/sbin/provision-sdn-evaluation
+    owner: root:root
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      mkdir -p /mnt/repo
+      mountpoint -q /mnt/repo || mount -t 9p -o trans=virtio,version=9p2000.L repo /mnt/repo
+      mkdir -p /mnt/repo/final-evaluation-artifacts
+      exec > >(tee /mnt/repo/final-evaluation-artifacts/vm-provision.log) 2>&1
+      trap 'rc=$?; echo "FAIL rc=$rc $(date --iso-8601=seconds)" > /mnt/repo/final-evaluation-artifacts/vm-provision-status.txt; sync; poweroff' ERR
+      echo "RUNNING $(date --iso-8601=seconds)" > /mnt/repo/final-evaluation-artifacts/vm-provision-status.txt
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update
+      apt-get install -y mininet openvswitch-switch iperf3 python3-venv python3-pip
+      python3 -m venv --system-site-packages /home/mohit/sdn-venv
+      /home/mohit/sdn-venv/bin/python -m pip install "pip<24" "setuptools<60" wheel
+      /home/mohit/sdn-venv/bin/python -m pip install -r /mnt/repo/requirements-controller.txt
+      /home/mohit/sdn-venv/bin/python -m pip install /mnt/repo/work/final-evaluation-vm/mininet-2.3.0.tar.gz
+      systemctl enable openvswitch-switch
+      /home/mohit/sdn-venv/bin/python -m pip freeze > /mnt/repo/final-evaluation-artifacts/vm-python-packages.txt
+      sha256sum /mnt/repo/work/final-evaluation-vm/mininet-2.3.0.tar.gz > /mnt/repo/final-evaluation-artifacts/mininet-source.sha256
+      uname -a > /mnt/repo/final-evaluation-artifacts/vm-kernel.txt
+      echo "READY $(date --iso-8601=seconds)" > /mnt/repo/final-evaluation-artifacts/vm-provision-status.txt
+      sync
+      poweroff
+runcmd:
+  - [bash, -lc, '/usr/local/sbin/provision-sdn-evaluation']
+final_message: "SDN evaluation VM provisioning finished"

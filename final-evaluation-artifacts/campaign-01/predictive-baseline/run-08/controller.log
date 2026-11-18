@@ -1,0 +1,218 @@
+loading app /mnt/repo/path_switch_controller.py
+loading app ryu.controller.ofp_handler
+instantiating app /mnt/repo/path_switch_controller.py of PathSwitchController
+Control mode=predictive model=persistence configured=persistence horizon=5s telemetry=/tmp/sdn-final-campaign/predictive-baseline/run-08/telemetry.csv
+OpenFlow port stats do not expose delay; live telemetry records a zero placeholder that audited dataset preparation replaces with measured ping RTT.
+instantiating app ryu.controller.ofp_handler of OFPHandler
+Switch connected: s1 (dpid=1)
+Switch connected: s2 (dpid=2)
+Switch connected: s3 (dpid=3)
+Switch connected: s4 (dpid=4)
+Telemetry S1-S2 history_count=1 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=1 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=2 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=2 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=3 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=3 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=4 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=4 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=5 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=5 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=6 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=6 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=7 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=7 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=8 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=8 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=9 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=9 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=10 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=10 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 current=30.83% predicted_t+5=30.83%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=30.94% predicted_t+5=30.94%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=30.81% predicted_t+5=30.81%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=30.94% predicted_t+5=30.94%
+Telemetry S1-S3 current=0.01% predicted_t+5=0.01%
+Telemetry S1-S2 current=30.83% predicted_t+5=30.83%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=30.86% predicted_t+5=30.86%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=30.90% predicted_t+5=30.90%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=30.86% predicted_t+5=30.86%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=30.96% predicted_t+5=30.96%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=30.82% predicted_t+5=30.82%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=30.85% predicted_t+5=30.85%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=65.75% predicted_t+5=65.75%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=72.00% predicted_t+5=72.00%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=72.04% predicted_t+5=72.04%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=72.01% predicted_t+5=72.01%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=72.11% predicted_t+5=72.11%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=72.03% predicted_t+5=72.03%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=71.97% predicted_t+5=71.97%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=72.14% predicted_t+5=72.14%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=71.96% predicted_t+5=71.96%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=72.03% predicted_t+5=72.03%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=72.03% predicted_t+5=72.03%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=72.05% predicted_t+5=72.05%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=72.11% predicted_t+5=72.11%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=71.99% predicted_t+5=71.99%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=71.94% predicted_t+5=71.94%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=82.68% predicted_t+5=82.68%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=92.60% predicted_t+5=92.60%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=92.66% predicted_t+5=92.66%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=92.64% predicted_t+5=92.64%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+s1 updated: h1 traffic now -> port 3 (s3)
+s4 updated: h2 traffic now -> port 3 (s3)
+Active path is now B (predictive projected policy A=92.64% B=46.32%)
+Telemetry S1-S2 current=0.48% predicted_t+5=0.48%
+Telemetry S1-S3 current=45.97% predicted_t+5=45.97%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=46.30% predicted_t+5=46.30%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=46.33% predicted_t+5=46.33%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=46.30% predicted_t+5=46.30%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=46.29% predicted_t+5=46.29%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=46.30% predicted_t+5=46.30%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=46.31% predicted_t+5=46.31%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=46.37% predicted_t+5=46.37%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=46.32% predicted_t+5=46.32%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=46.27% predicted_t+5=46.27%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=46.35% predicted_t+5=46.35%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=52.87% predicted_t+5=52.87%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.92% predicted_t+5=66.92%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.84% predicted_t+5=66.84%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.89% predicted_t+5=66.89%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.90% predicted_t+5=66.90%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.88% predicted_t+5=66.88%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.87% predicted_t+5=66.87%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.91% predicted_t+5=66.91%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.90% predicted_t+5=66.90%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.90% predicted_t+5=66.90%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.93% predicted_t+5=66.93%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.89% predicted_t+5=66.89%
+Telemetry S1-S2 current=0.01% predicted_t+5=0.01%
+Telemetry S1-S3 current=66.86% predicted_t+5=66.86%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.94% predicted_t+5=66.94%
+Telemetry S1-S2 current=0.01% predicted_t+5=0.01%
+Telemetry S1-S3 current=66.89% predicted_t+5=66.89%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.83% predicted_t+5=66.83%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.89% predicted_t+5=66.89%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.86% predicted_t+5=66.86%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.95% predicted_t+5=66.95%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.83% predicted_t+5=66.83%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.93% predicted_t+5=66.93%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.91% predicted_t+5=66.91%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.83% predicted_t+5=66.83%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.86% predicted_t+5=66.86%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=66.92% predicted_t+5=66.92%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=32.63% predicted_t+5=32.63%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=25.75% predicted_t+5=25.75%
+Telemetry S1-S2 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S3 current=25.72% predicted_t+5=25.72%
+s1 updated: h1 traffic now -> port 2 (s2)
+s4 updated: h2 traffic now -> port 2 (s2)
+Active path is now A (predictive projected policy A=51.43% B=25.72%)
+Telemetry S1-S2 current=51.20% predicted_t+5=51.20%
+Telemetry S1-S3 current=0.18% predicted_t+5=0.18%
+Telemetry S1-S2 current=51.53% predicted_t+5=51.53%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=51.44% predicted_t+5=51.44%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=51.45% predicted_t+5=51.45%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=51.47% predicted_t+5=51.47%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=51.45% predicted_t+5=51.45%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=51.43% predicted_t+5=51.43%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=51.50% predicted_t+5=51.50%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=51.44% predicted_t+5=51.44%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=51.42% predicted_t+5=51.42%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=51.42% predicted_t+5=51.42%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=51.41% predicted_t+5=51.41%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=51.53% predicted_t+5=51.53%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=51.45% predicted_t+5=51.45%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=51.40% predicted_t+5=51.40%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=51.54% predicted_t+5=51.54%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=51.41% predicted_t+5=51.41%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=21.27% predicted_t+5=21.27%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=0.01% predicted_t+5=0.01%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=0.01% predicted_t+5=0.01%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=0.01% predicted_t+5=0.01%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%
+Telemetry S1-S2 current=0.01% predicted_t+5=0.01%
+Telemetry S1-S3 current=0.00% predicted_t+5=0.00%

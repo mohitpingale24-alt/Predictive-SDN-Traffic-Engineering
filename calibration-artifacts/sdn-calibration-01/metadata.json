@@ -1,0 +1,41 @@
+{
+  "system": "reactive",
+  "control_mode": "reactive",
+  "model": "persistence",
+  "path_a_capacity_mbps": 10.0,
+  "path_b_capacity_mbps": 20.0,
+  "congestion_threshold": 85.0,
+  "recovery_threshold": 70.0,
+  "workload": [
+    {
+      "name": "warmup",
+      "rate_mbps": 3,
+      "duration_seconds": 15
+    },
+    {
+      "name": "ramp",
+      "rate_mbps": 7,
+      "duration_seconds": 15
+    },
+    {
+      "name": "near_threshold",
+      "rate_mbps": 9,
+      "duration_seconds": 15
+    },
+    {
+      "name": "congestion",
+      "rate_mbps": 13,
+      "duration_seconds": 25
+    },
+    {
+      "name": "recovery",
+      "rate_mbps": 5,
+      "duration_seconds": 20
+    }
+  ],
+  "repetitions": 8,
+  "created_at": 1788328170.744277,
+  "workload_started_at": 1788328185.364028,
+  "finished_at": 1788328924.648252,
+  "status": "complete"
+}

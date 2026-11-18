@@ -1,0 +1,30 @@
+loading app /mnt/repo/path_switch_controller.py
+loading app ryu.controller.ofp_handler
+instantiating app /mnt/repo/path_switch_controller.py of PathSwitchController
+Control mode=static model=persistence configured=persistence horizon=5s telemetry=/tmp/sdn-final-campaign/static/run-03/telemetry.csv
+OpenFlow port stats do not expose delay; live telemetry records a zero placeholder that audited dataset preparation replaces with measured ping RTT.
+instantiating app ryu.controller.ofp_handler of OFPHandler
+Switch connected: s1 (dpid=1)
+Switch connected: s2 (dpid=2)
+Switch connected: s3 (dpid=3)
+Switch connected: s4 (dpid=4)
+Telemetry S1-S2 history_count=1 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=1 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=2 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=2 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=3 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=3 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=4 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=4 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=5 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=5 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=6 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=6 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=7 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=7 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=8 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=8 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=9 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=9 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S2 history_count=10 prediction=SKIPPED (requires 11 samples)
+Telemetry S1-S3 history_count=10 prediction=SKIPPED (requires 11 samples)

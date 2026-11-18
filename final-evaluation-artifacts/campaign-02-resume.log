@@ -1,0 +1,24 @@
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-ml/run-03
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-ml/run-04
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-ml/run-05
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-ml/run-06
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-ml/run-07
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-ml/run-08

@@ -1,0 +1,120 @@
+{"status": "PASS", "model": "gradient_boosting", "parity_cases": 38, "max_error": 1.0658141036401503e-14}
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02-smoke-v2
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/static/run-01
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/static/run-02
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/static/run-03
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/static/run-04
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/static/run-05
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/static/run-06
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/static/run-07
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/static/run-08
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/reactive/run-01
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/reactive/run-02
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/reactive/run-03
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/reactive/run-04
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/reactive/run-05
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/reactive/run-06
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/reactive/run-07
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/reactive/run-08
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-baseline/run-01
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-baseline/run-02
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-baseline/run-03
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-baseline/run-04
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-baseline/run-05
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-baseline/run-06
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-baseline/run-07
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-baseline/run-08
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-ml/run-01
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/repo/final-evaluation-artifacts/campaign-02/predictive-ml/run-02
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Traceback (most recent call last):
+  File "experiments/run_experiment.py", line 356, in <module>
+    run()
+  File "experiments/run_experiment.py", line 323, in run
+    metadata["quality_gate"] = check_run(output_dir, metadata)
+  File "/home/mohit/campaign-02-v2-source/experiments/quality_gate.py", line 27, in check_run
+    raise ValueError("Controller error found in log")
+ValueError: Controller error found in log

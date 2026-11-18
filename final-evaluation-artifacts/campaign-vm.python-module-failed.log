@@ -1,0 +1,32 @@
+ryu-manager 4.34
+{'configured_model': 'gradient_boosting', 'active_model': 'gradient_boosting', 'model_selection_metric': 'congestion_f1', 'model_mae': 11.915870686822982, 'model_rmse': 16.107081203655675, 'model_r2': 0.7004493250334322, 'n_features': 13, 'features': ['utilization', 'throughput', 'delay', 'packet_loss', 'active_flows', 'util_lag_1', 'util_lag_2', 'util_lag_3', 'util_lag_5', 'util_lag_10', 'util_ma_5s', 'util_ma_10s', 'util_slope'], 'prediction_horizon_seconds': 5, 'sampling_interval_seconds': 1, 'inference_time_ms': 0.0025596064806113}
+*** Removing excess controllers/ofprotocols/ofdatapaths/pings/noxes
+killall controller ofprotocol ofdatapath ping nox_core lt-nox_core ovs-openflowd ovs-controller udpbwtest mnexec ivs 2> /dev/null
+killall -9 controller ofprotocol ofdatapath ping nox_core lt-nox_core ovs-openflowd ovs-controller udpbwtest mnexec ivs 2> /dev/null
+pkill -9 -f "sudo mnexec"
+*** Removing junk from /tmp
+rm -f /tmp/vconn* /tmp/vlogs* /tmp/*.out /tmp/*.log
+*** Removing old X11 tunnels
+*** Removing excess kernel datapaths
+ps ax | egrep -o 'dp[0-9]+' | sed 's/dp/nl:/'
+***  Removing OVS datapaths
+ovs-vsctl --timeout=1 list-br
+ovs-vsctl --timeout=1 list-br
+*** Removing all links of the pattern foo-ethX
+ip link show | egrep -o '([-_.[:alnum:]]+-eth[[:digit:]]+)'
+ip link show
+*** Killing stale mininet node processes
+pkill -9 -f mininet:
+*** Shutting down stale tunnels
+pkill -9 -f Tunnel=Ethernet
+pkill -9 -f .ssh/mn
+rm -f ~/.ssh/mn/*
+*** Cleanup complete.
+Traceback (most recent call last):
+  File "experiments/run_experiment.py", line 335, in <module>
+    run()
+  File "experiments/run_experiment.py", line 268, in run
+    net, h1, h2 = build_network(
+  File "experiments/run_experiment.py", line 143, in build_network
+    from mininet.link import TCLink
+ModuleNotFoundError: No module named 'mininet'

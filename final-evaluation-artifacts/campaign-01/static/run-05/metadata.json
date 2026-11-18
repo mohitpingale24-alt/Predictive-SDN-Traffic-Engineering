@@ -1,0 +1,170 @@
+{
+  "experiment_id": "run-05",
+  "created_at_iso": "2026-09-04T06:16:29.540580+00:00",
+  "command_line": [
+    "/home/mohit/sdn-venv/bin/python3",
+    "experiments/run_experiment.py",
+    "--system",
+    "static",
+    "--output-dir",
+    "/tmp/sdn-final-campaign/static/run-05"
+  ],
+  "system": "static",
+  "control_mode": "static",
+  "model": "persistence",
+  "path_a_capacity_mbps": 10.0,
+  "path_b_capacity_mbps": 20.0,
+  "congestion_threshold": 85.0,
+  "recovery_threshold": 70.0,
+  "sampling_interval_seconds": 1.0,
+  "prediction_horizon_seconds": 5,
+  "history_samples_required": 11,
+  "environment": {
+    "host_os": "Ubuntu 20.04.6 LTS",
+    "kernel": "5.4.0-216-generic",
+    "architecture": "aarch64",
+    "python": "3.8.10",
+    "mininet": "2.3.0",
+    "open_vswitch": "ovs-vswitchd (Open vSwitch) 2.13.8",
+    "ryu": "ryu-manager 4.34",
+    "iperf3": "iperf 3.7 (cJSON 1.5.2)",
+    "traffic_control": "tc utility, iproute2-ss200127"
+  },
+  "repository": {
+    "commit": "unavailable",
+    "branch": "unavailable",
+    "status_porcelain": [
+      "unavailable"
+    ],
+    "source_sha256": {
+      "path_switch_controller.py": "0340f3e9e0f8441a70a1cce175edf85e36445d9c22332c17c0ec9bf7ddf09c53",
+      "telemetry_runtime.py": "aaf1fdcc79d10658dbf47c70544cd7af875883f1dc01b44b6e963c217acd63a1",
+      "topology.py": "ee97165de7949266e13fff06b0cf338a8be5f8e948ae88540c3f67172489363c",
+      "experiments/run_experiment.py": "d1eea6245c087c06890b49b20664744d0d71bdda9bdb33153b4722ab03e761b8",
+      "experiments/prepare_real_dataset.py": "5da741072a3ee9fb87eb9735eed5d07e6294d016b47f5399022ead3b7a36da27",
+      "cnt-ml/models/xgb_link_predictor.joblib": "83d66a75bc967f5de23e48e722157d3e8c2c724cb60ccef9a3ea8eb16a0c5711",
+      "cnt-ml/models/feature_list.json": "e4f225fc32efea36621c3830bc57e441b782e3935bb7aae19dfff8f16120ceb1",
+      "cnt-ml/results/metrics_comparison.csv": "844486cfc438c728bd277d1521b0b886c66a05c09638b0593c6bc8838f1cf844",
+      "cnt-ml/results/congestion_metrics.csv": "1e5b2a44978f0d74a4bc8e79d190770bae4a7d5a4d77215314d984caac699dbe"
+    }
+  },
+  "topology": {
+    "hosts": [
+      "h1",
+      "h2"
+    ],
+    "switches": [
+      "s1",
+      "s2",
+      "s3",
+      "s4"
+    ],
+    "path_a": {
+      "links": [
+        "s1-s2",
+        "s2-s4"
+      ],
+      "capacity_mbps": 10.0,
+      "delay_per_link": "2ms",
+      "max_queue_packets": 100,
+      "qdisc": "htb"
+    },
+    "path_b": {
+      "links": [
+        "s1-s3",
+        "s3-s4"
+      ],
+      "capacity_mbps": 20.0,
+      "delay_per_link": "4ms",
+      "max_queue_packets": 100,
+      "qdisc": "htb"
+    }
+  },
+  "controller": {
+    "mode": "static",
+    "model": "persistence",
+    "congestion_threshold_percent": 85.0,
+    "recovery_threshold_percent": 70.0,
+    "minimum_improvement_percent": 5.0,
+    "consecutive_signals": 3,
+    "cooldown_seconds": 15.0,
+    "prediction_horizon_seconds": 5,
+    "history_samples_required": 11,
+    "openflow_port": 6633
+  },
+  "traffic": {
+    "protocol": "UDP",
+    "generator": "iperf3",
+    "client": "h1",
+    "server": "h2",
+    "iperf_arguments": "-u -b <rate>M -t <duration> -J",
+    "ping_arguments": "-D -i 1",
+    "workload": [
+      {
+        "name": "warmup",
+        "rate_mbps": 3,
+        "duration_seconds": 15
+      },
+      {
+        "name": "ramp",
+        "rate_mbps": 7,
+        "duration_seconds": 15
+      },
+      {
+        "name": "near_threshold",
+        "rate_mbps": 9,
+        "duration_seconds": 15
+      },
+      {
+        "name": "congestion",
+        "rate_mbps": 13,
+        "duration_seconds": 25
+      },
+      {
+        "name": "recovery",
+        "rate_mbps": 5,
+        "duration_seconds": 20
+      }
+    ],
+    "repetitions": 1
+  },
+  "artifacts": {
+    "source_telemetry": "telemetry.csv",
+    "candidate_dataset": "telemetry_real_candidate.csv",
+    "candidate_provenance": "telemetry_real_candidate.csv.provenance.json",
+    "sampling_gap_report": "sampling_gaps.json"
+  },
+  "workload": [
+    {
+      "name": "warmup",
+      "rate_mbps": 3,
+      "duration_seconds": 15
+    },
+    {
+      "name": "ramp",
+      "rate_mbps": 7,
+      "duration_seconds": 15
+    },
+    {
+      "name": "near_threshold",
+      "rate_mbps": 9,
+      "duration_seconds": 15
+    },
+    {
+      "name": "congestion",
+      "rate_mbps": 13,
+      "duration_seconds": 25
+    },
+    {
+      "name": "recovery",
+      "rate_mbps": 5,
+      "duration_seconds": 20
+    }
+  ],
+  "repetitions": 1,
+  "created_at": 1788502589.7014766,
+  "workload_started_at": 1788502600.9187074,
+  "finished_at": 1788502696.5016623,
+  "finished_at_iso": "2026-09-04T06:18:16.501680+00:00",
+  "status": "complete"
+}

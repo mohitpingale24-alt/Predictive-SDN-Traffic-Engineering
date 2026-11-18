@@ -1,0 +1,12 @@
+{"status": "PASS", "model": "gradient_boosting", "parity_cases": 38, "max_error": 1.0658141036401503e-14}
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Traceback (most recent call last):
+  File "experiments/run_experiment.py", line 356, in <module>
+    run()
+  File "experiments/run_experiment.py", line 323, in run
+    metadata["quality_gate"] = check_run(output_dir, metadata)
+  File "/home/mohit/campaign-02-source/experiments/quality_gate.py", line 27, in check_run
+    raise ValueError("Controller error found in log")
+ValueError: Controller error found in log

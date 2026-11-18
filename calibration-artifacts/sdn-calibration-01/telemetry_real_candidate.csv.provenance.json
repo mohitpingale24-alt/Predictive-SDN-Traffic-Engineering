@@ -1,0 +1,13 @@
+{
+  "source_run": "/tmp/sdn-calibration-01",
+  "source_system": "reactive",
+  "source_model": "persistence",
+  "source_rows": 1480,
+  "normalized_rows": 1480,
+  "timestamp_origin": 1788328180.0,
+  "sampling_interval_seconds": 1,
+  "limitations": [
+    "delay is a zero placeholder from OpenFlow port telemetry",
+    "queue_occupancy is a zero placeholder from OpenFlow port telemetry"
+  ]
+}

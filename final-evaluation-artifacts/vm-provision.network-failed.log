@@ -1,0 +1,4 @@
+Err:1 http://ports.ubuntu.com/ubuntu-ports focal InRelease
+  Temporary failure resolving 'ports.ubuntu.com'
+Err:2 http://ports.ubuntu.com/ubuntu-ports focal-updates InRelease
+  Temporary failure resolving 'ports.ubuntu.com'

@@ -1,0 +1,167 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'mininet'
+Processing /mnt/repo/work/final-evaluation-vm/mininet-2.3.0.tar.gz
+Requirement already satisfied: setuptools in /home/mohit/sdn-venv/lib/python3.8/site-packages (from mininet==2.3.0) (44.0.0)
+Building wheels for collected packages: mininet
+  Building wheel for mininet (setup.py): started
+  Building wheel for mininet (setup.py): finished with status 'done'
+  Created wheel for mininet: filename=mininet-2.3.0-py3-none-any.whl size=154059 sha256=25225692aa51400ae724adb192a2b3e69ee108cded0e107ca3068e7d61dc86cd
+  Stored in directory: /root/.cache/pip/wheels/ac/e6/b9/5ed46709dc5d7545e38e8a8977d5f83bd9d65ff887bb2342b9
+Successfully built mininet
+Installing collected packages: mininet
+Successfully installed mininet-2.3.0
+ryu-manager 4.34
+{'configured_model': 'gradient_boosting', 'active_model': 'gradient_boosting', 'model_selection_metric': 'congestion_f1', 'model_mae': 11.915870686822982, 'model_rmse': 16.107081203655675, 'model_r2': 0.7004493250334322, 'n_features': 13, 'features': ['utilization', 'throughput', 'delay', 'packet_loss', 'active_flows', 'util_lag_1', 'util_lag_2', 'util_lag_3', 'util_lag_5', 'util_lag_10', 'util_ma_5s', 'util_ma_10s', 'util_slope'], 'prediction_horizon_seconds': 5, 'sampling_interval_seconds': 1, 'inference_time_ms': 0.0025596064806113}
+*** Removing excess controllers/ofprotocols/ofdatapaths/pings/noxes
+killall controller ofprotocol ofdatapath ping nox_corelt-nox_core ovs-openflowd ovs-controllerovs-testcontroller udpbwtest mnexec ivs ryu-manager 2> /dev/null
+killall -9 controller ofprotocol ofdatapath ping nox_corelt-nox_core ovs-openflowd ovs-controllerovs-testcontroller udpbwtest mnexec ivs ryu-manager 2> /dev/null
+pkill -9 -f "sudo mnexec"
+*** Removing junk from /tmp
+rm -f /tmp/vconn* /tmp/vlogs* /tmp/*.out /tmp/*.log
+*** Removing old X11 tunnels
+*** Removing excess kernel datapaths
+ps ax | egrep -o 'dp[0-9]+' | sed 's/dp/nl:/'
+***  Removing OVS datapaths
+ovs-vsctl --timeout=1 list-br
+ovs-vsctl --timeout=1 list-br
+*** Removing all links of the pattern foo-ethX
+ip link show | egrep -o '([-_.[:alnum:]]+-eth[[:digit:]]+)'
+ip link show
+*** Killing stale mininet node processes
+pkill -9 -f mininet:
+*** Shutting down stale tunnels
+pkill -9 -f Tunnel=Ethernet
+pkill -9 -f .ssh/mn
+rm -f ~/.ssh/mn/*
+*** Cleanup complete.
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /tmp/sdn-final-campaign/static/run-01
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /tmp/sdn-final-campaign/static/run-02
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /tmp/sdn-final-campaign/static/run-03
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /tmp/sdn-final-campaign/static/run-04
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /tmp/sdn-final-campaign/static/run-05
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /tmp/sdn-final-campaign/static/run-06
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /tmp/sdn-final-campaign/static/run-07
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /tmp/sdn-final-campaign/static/run-08
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /tmp/sdn-final-campaign/reactive/run-01
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /tmp/sdn-final-campaign/reactive/run-02
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /tmp/sdn-final-campaign/reactive/run-03
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /tmp/sdn-final-campaign/reactive/run-04
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /tmp/sdn-final-campaign/reactive/run-05
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /tmp/sdn-final-campaign/reactive/run-06
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /tmp/sdn-final-campaign/reactive/run-07
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /tmp/sdn-final-campaign/reactive/run-08
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /tmp/sdn-final-campaign/predictive-baseline/run-01
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /tmp/sdn-final-campaign/predictive-baseline/run-02
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /tmp/sdn-final-campaign/predictive-baseline/run-03
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /tmp/sdn-final-campaign/predictive-baseline/run-04
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /tmp/sdn-final-campaign/predictive-baseline/run-05
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /tmp/sdn-final-campaign/predictive-baseline/run-06
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /tmp/sdn-final-campaign/predictive-baseline/run-07
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /tmp/sdn-final-campaign/predictive-baseline/run-08
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /tmp/sdn-final-campaign/predictive-ml/run-01
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /tmp/sdn-final-campaign/predictive-ml/run-02
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /tmp/sdn-final-campaign/predictive-ml/run-03
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /tmp/sdn-final-campaign/predictive-ml/run-04
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /tmp/sdn-final-campaign/predictive-ml/run-05
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /tmp/sdn-final-campaign/predictive-ml/run-06
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /tmp/sdn-final-campaign/predictive-ml/run-07
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /tmp/sdn-final-campaign/predictive-ml/run-08
+Saved 32 per-run observations and aggregate statistics -> /tmp/sdn-final-campaign/analysis
+Experiment suite complete: /tmp/sdn-final-campaign
