@@ -17,6 +17,7 @@ SYSTEM_CONFIG = {
     "predictive-safe": dict(control_mode="predictive", model="gradient_boosting", confidence_gate=True, safe_reroute=True),
     "predictive-confidence": dict(control_mode="predictive", model="gradient_boosting", confidence_gate=True, safe_reroute=False),
     "predictive-safe-only": dict(control_mode="predictive", model="gradient_boosting", confidence_gate=False, safe_reroute=True),
+    "ecmp": dict(control_mode="ecmp", model="persistence", confidence_gate=False, safe_reroute=False),
 }
 PRIMARY_SYSTEMS = tuple(SYSTEM_CONFIG)[:5]
 ABLATION_SYSTEMS = tuple(SYSTEM_CONFIG)[5:]
@@ -59,6 +60,28 @@ SCENARIOS = {
         _segment("unsafe_alternative", 13, 40), _segment("recovery", 3, 20),
     ]),
 }
+
+# Harder workload families (top-notch extension), kept separate so the
+# original campaign plan (7 scenarios x primary systems) is unchanged.
+# Segment rates/durations are the workload *specification*; the on/off burst
+# pattern is generated from parameters, not hand-listed per second.
+EXTENSION_SCENARIOS = {
+    "bursty-mixed": dict(topology="diamond4", workload=[
+        _segment("warmup", 3, 15),
+        *[_segment("on_off_%02d" % (index + 1), rate, 5)
+          for index, rate in enumerate((14.0, 2.0) * 4)],
+        _segment("mixed_hold", 9, 20),
+        _segment("recovery", 3, 15),
+    ]),
+    "elephant-mice": dict(topology="access6", workload=[
+        _segment("warmup", 3, 15), _segment("mice_baseline", 4, 20),
+        _segment("elephant_arrives", 14, 30), _segment("recovery", 3, 25),
+    ]),
+    "multi-pair": dict(topology="access6", workload=[
+        _segment("warmup", 3, 15), _segment("pairs_ramp", 8, 25),
+        _segment("pairs_congested", 13, 25), _segment("recovery", 3, 25),
+    ]),
+}
 TOPOLOGIES = ("diamond4", "access6")
 
 
@@ -69,9 +92,9 @@ def scenario_definition(name, topology=None, path_a_capacity=None,
     Scaling is for explicit smoke runs. A scaled run is marked as smoke and
     must not be grouped with full protocol repetitions in research results.
     """
-    if name not in SCENARIOS:
+    if name not in SCENARIOS and name not in EXTENSION_SCENARIOS:
         raise ValueError("Unknown research scenario: " + str(name))
-    definition = deepcopy(SCENARIOS[name])
+    definition = deepcopy((SCENARIOS.get(name) or EXTENSION_SCENARIOS[name]))
     chosen_topology = topology or definition["topology"]
     if chosen_topology not in TOPOLOGIES:
         raise ValueError("Unknown research topology: " + str(chosen_topology))

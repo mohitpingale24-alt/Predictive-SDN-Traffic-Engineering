@@ -23,7 +23,8 @@ CAMPAIGN = ROOT / 'final-evaluation-artifacts/campaign-02'
 ASSETS = Path(__file__).resolve().parent / 'dist'
 LABELS = dict(zip(SYSTEMS, ('Static', 'Reactive', 'Persistence', 'Predictive GB')))
 LABELS.update({'predictive-safe': 'GB + confidence + safe',
-               'predictive-confidence': 'GB + confidence', 'predictive-safe-only': 'GB + safe'})
+               'predictive-confidence': 'GB + confidence', 'predictive-safe-only': 'GB + safe',
+               'ecmp': 'ECMP (capacity-weighted)'})
 METRICS = [('P95_Latency_ms', 'P95 RTT', 'ms'), ('Average_Throughput_Mbps', 'Goodput', 'Mbps'),
            ('Average_Packet_Loss_pct', 'Packet loss', '%'), ('Congestion_Duration_seconds', 'Congestion', 's'),
            ('Average_Latency_ms', 'Average RTT', 'ms'), ('Average_Jitter_ms', 'Jitter', 'ms'),
@@ -149,6 +150,22 @@ def capture_data(directory, system, name, reference=None):
                      confidence=meta.get('confidence')))
 
 
+def _tail_csv(path, limit=50):
+    if not path.exists(): return []
+    try: rows = read_csv(path)
+    except (OSError, ValueError): return []
+    return safe(rows[-limit:])
+
+def topnotch_data():
+    results = ROOT / 'cnt-ml/results'
+    return dict(explanations=_tail_csv(results / 'explanations.csv'),
+                drift=_tail_csv(results / 'drift.csv'),
+                failures=_tail_csv(results / 'failures.csv'))
+
+def campaign_report():
+    import generate_campaign_report
+    return safe(generate_campaign_report.build_report(CAMPAIGN))
+
 def live_data(identifier):
     directory = live_runtime.session_path(identifier)
     session = json.loads((directory / 'session.json').read_text())
@@ -188,6 +205,8 @@ class Handler(BaseHTTPRequestHandler):
                 query = parse_qs(url.query)
                 return self.respond(live_data(query.get('id', [''])[0]))
             if url.path == '/api/state': return self.respond(catalog())
+            if url.path == '/api/topnotch': return self.respond(topnotch_data())
+            if url.path == '/api/report': return self.respond(campaign_report())
             if url.path == '/api/research':
                 from analyze_research import research_catalog
                 return self.respond(research_catalog())

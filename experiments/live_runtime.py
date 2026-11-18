@@ -17,9 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 LIVE = ROOT / 'live-experiments'
 BASE = ROOT / 'work/final-evaluation-vm/sdn-final-evaluation.qcow2'
 SYSTEMS = ('static', 'reactive', 'predictive-baseline', 'predictive-ml',
-           'predictive-safe', 'predictive-confidence', 'predictive-safe-only')
+           'predictive-safe', 'predictive-confidence', 'predictive-safe-only', 'ecmp')
 SCENARIOS = ('legacy', 'normal', 'ramp', 'burst', 'sustained', 'near-threshold',
-             'multi-flow', 'alternative-stress')
+             'multi-flow', 'alternative-stress', 'bursty-mixed', 'elephant-mice', 'multi-pair')
 TOPOLOGIES = ('diamond4', 'access6')
 TERMINAL = ('complete', 'failed', 'cancelled', 'interrupted')
 
@@ -172,7 +172,10 @@ def worker(identifier, lock_fd):
         source = directory / 'source'
         source.mkdir()
         for name in ('path_switch_controller.py', 'telemetry_runtime.py', 'topology.py',
-                     'route_transition.py', 'openflow_routes.py', 'confidence_policy.py'):
+                     'route_transition.py', 'openflow_routes.py', 'confidence_policy.py',
+                     'topology_graph.py', 'failure_recovery.py', 'drift_detection.py',
+                     'explainability.py', 'anomaly_mitigation.py', 'topologies_v2.py',
+                     'conformal_runtime.py', 'drift_adaptation.py', 'link_map.py'):
             shutil.copy2(ROOT / name, source / name)
         for name in ('experiments', 'cnt-ml/src'):
             shutil.copytree(ROOT / name, source / name, ignore=shutil.ignore_patterns('__pycache__'))

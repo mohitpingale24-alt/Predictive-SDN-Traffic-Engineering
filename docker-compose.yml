@@ -1,0 +1,8 @@
+services:
+  dashboard:
+    build: .
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - ./cnt-ml/results:/app/cnt-ml/results
+      - ./final-evaluation-artifacts:/app/final-evaluation-artifacts:ro

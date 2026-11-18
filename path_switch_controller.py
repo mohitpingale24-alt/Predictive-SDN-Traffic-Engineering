@@ -21,6 +21,18 @@ from confidence import ConfidenceEstimator
 from confidence_policy import select_signals
 from openflow_routes import OpenFlowRouteAdapter
 from route_transition import SafeRouteTransition
+try:
+    from failure_recovery import FailureRecoveryTracker
+    from drift_detection import DriftMonitor, write_recalibration_artifact
+    from explainability import (EXPLANATION_FIELDS, build_explanation,
+                                explanation_csv_row, portable_gbdt_importance)
+    from anomaly_mitigation import SurgeDetector
+    from conformal_runtime import ConformalRuntime
+    from drift_adaptation import AdwinLite, PageHinkley
+    TOPNOTCH_AVAILABLE = True
+except Exception:  # New modules are additive; legacy modes must still run.
+    TOPNOTCH_AVAILABLE = False
+
 from telemetry_runtime import (
     CONTROL_EVENT_FIELDS,
     PREDICTION_FIELDS,
@@ -32,6 +44,8 @@ from telemetry_runtime import (
     TelemetryCsvRecorder,
     project_path_signals,
 )
+from link_map import (canonical_reporters, link_capacity_mbps,
+                      links_in_map, load_link_map)
 
 PATH_FILE = '/tmp/active_path'
 SWITCH_NAMES = {1: 's1', 2: 's2', 3: 's3', 4: 's4', 5: 's5', 6: 's6'}
@@ -53,10 +67,20 @@ DECISION_FIELDS = ['timestamp', 'active_path', 'source', 'prediction', 'lower', 
 CONFIDENCE_FIELDS = ['timestamp', 'path', 'prediction', 'lower', 'upper', 'width',
                      'nominal_coverage', 'in_domain', 'confidence_gate_pass', 'gate_reason']
 TRANSITION_FIELDS = ['timestamp', 'transition_id', 'stage', 'status', 'old_path', 'new_path', 'detail']
+FAILURE_FIELDS = ['timestamp', 'event', 'link_id', 'path', 'active_path', 'detail']
+DRIFT_FIELDS = ['timestamp', 'n', 'mae', 'rmse', 'bias', 'baseline_rmse', 'threshold_rmse',
+                'drifting', 'drift_detected']
 TELEMETRY_PATH = os.getenv(
     'SDN_TELEMETRY_CSV',
     os.path.join(PROJECT_ROOT, 'cnt-ml', 'data', 'raw', 'telemetry_live.csv'),
 )
+LINK_MAP_PATH = os.getenv('SDN_LINK_MAP_PATH', '').strip() or None
+ALL_LINKS_CSV_PATH = os.getenv(
+    'SDN_ALL_LINKS_CSV',
+    os.path.join(os.path.dirname(TELEMETRY_PATH), 'telemetry_all_links.csv'),
+)
+DEFAULT_LINK_CAPACITY_MBPS = float(os.getenv('SDN_DEFAULT_LINK_CAPACITY_MBPS',
+                                             str(LINK_CAPACITY_MBPS)))
 PREDICTIONS_PATH = os.getenv(
     'SDN_PREDICTIONS_CSV',
     os.path.join(PROJECT_ROOT, 'cnt-ml', 'results', 'live_predictions.csv'),
@@ -85,9 +109,13 @@ class PathSwitchController(app_manager.RyuApp):
         self.last_policy_sample_time = None
         self.mac_to_port = {}
         self.rate_tracker = PortRateTracker()
+        self.all_link_tracker = PortRateTracker()
+        self.link_map = load_link_map(LINK_MAP_PATH)
+        self._canonical_reporters = canonical_reporters(self.link_map)
         self.feature_history = FeatureHistory(require_contiguous=os.getenv('SDN_CONTIGUOUS_HISTORY', '0') == '1')
         self.rtt = RecentRTT(os.getenv('SDN_PING_LOG'))
         self.telemetry_recorder = TelemetryCsvRecorder(TELEMETRY_PATH)
+        self.all_links_recorder = TelemetryCsvRecorder(ALL_LINKS_CSV_PATH)
         self.prediction_recorder = StructuredCsvRecorder(PREDICTIONS_PATH, PREDICTION_FIELDS)
         self.control_event_recorder = StructuredCsvRecorder(CONTROL_EVENTS_PATH, CONTROL_EVENT_FIELDS)
         output = os.path.dirname(CONTROL_EVENTS_PATH)
@@ -102,8 +130,8 @@ class PathSwitchController(app_manager.RyuApp):
         if SAFE_REROUTE:
             self._record_transition(0, 'controller', 'ready', 'A', 'A',
                                     'Shared-route make-before-break enabled; not cross-switch atomic')
-        if CONTROL_MODE not in {'static', 'reactive', 'predictive'}:
-            raise ValueError("SDN_CONTROL_MODE must be static, reactive, or predictive")
+        if CONTROL_MODE not in {'static', 'reactive', 'predictive', 'ecmp'}:
+            raise ValueError("SDN_CONTROL_MODE must be static, reactive, predictive, or ecmp")
         self.reroute_policy = ReroutePolicy(
             congestion_threshold=float(os.getenv('SDN_CONGESTION_THRESHOLD', '85')),
             recovery_threshold=float(os.getenv('SDN_RECOVERY_THRESHOLD', '70')),
@@ -122,12 +150,86 @@ class PathSwitchController(app_manager.RyuApp):
             CONTROL_MODE, model_info['active_model'], model_info['configured_model'],
             model_info['prediction_horizon_seconds'], TELEMETRY_PATH,
         )
+        # --- Top-notch extension state (all derived, nothing hardcoded) ---
+        self._topnotch = TOPNOTCH_AVAILABLE
+        self._pending_predictions = {'A': [], 'B': []}
+        self._last_features = {}
+        self._feature_importance = None
+        self._down_links = set()
+        output_dir = os.path.dirname(CONTROL_EVENTS_PATH)
+        if self._topnotch:
+            self.failure_tracker = FailureRecoveryTracker(
+                recovery_threshold=float(os.getenv('SDN_CONGESTION_THRESHOLD', '85')))
+            self.failure_recorder = StructuredCsvRecorder(
+                os.getenv('SDN_FAILURES_CSV', os.path.join(output_dir, 'failures.csv')), FAILURE_FIELDS)
+            self.explanation_recorder = StructuredCsvRecorder(
+                os.getenv('SDN_EXPLANATIONS_CSV', os.path.join(output_dir, 'explanations.csv')),
+                EXPLANATION_FIELDS)
+            self.drift_recorder = StructuredCsvRecorder(
+                os.getenv('SDN_DRIFT_CSV', os.path.join(output_dir, 'drift.csv')), DRIFT_FIELDS)
+            self.anomaly_detector = SurgeDetector(
+                z_threshold=float(os.getenv('SDN_ANOMALY_Z', '4')),
+                elephant_share=float(os.getenv('SDN_ELEPHANT_SHARE', '0.5')))
+            self.conformal = None
+            if os.getenv('SDN_CONFORMAL', '0') == '1':
+                artifact = os.getenv('SDN_CONFORMAL_ARTIFACT', os.path.join(
+                    PROJECT_ROOT, 'cnt-ml', 'models', 'conformal_calibration.json'))
+                if os.path.exists(artifact):
+                    self.conformal = ConformalRuntime(
+                        artifact, threshold=float(os.getenv('SDN_CONGESTION_THRESHOLD', '85')))
+                    self.logger.info("Conformal intervals active: coverage=%s radius=%s",
+                                     self.conformal.nominal_coverage, self.conformal.base_radius)
+                else:
+                    self.logger.error("SDN_CONFORMAL=1 but no artifact at %s; "
+                                      "run experiments/calibrate_conformal.py first", artifact)
+            self.detectors = {
+                'page_hinkley': PageHinkley(
+                    delta=float(os.getenv('SDN_PH_DELTA', '0.05')),
+                    threshold=float(os.getenv('SDN_PH_THRESHOLD', '5'))),
+                'adwin': AdwinLite(delta=float(os.getenv('SDN_ADWIN_DELTA', '0.002'))),
+            }
+            self._detector_fired = set()
+            self.drift_adaptation = os.getenv('SDN_DRIFT_ADAPTATION', 'none').strip().lower()
+            from collections import deque as _deque
+            self._recent_residuals = _deque(maxlen=int(os.getenv('SDN_DRIFT_WINDOW', '100')))
+            self._quantile_models = None
+        else:
+            self.failure_tracker = None
+            self.anomaly_detector = None
+            self.conformal = None
+            self.detectors = {}
+            self.drift_adaptation = 'none'
+        self.anomaly_mitigation = os.getenv('SDN_ANOMALY_MITIGATION', '0') == '1'
+        self.drift_monitor = None
+        self._drift_reported = False
         self.control_event_recorder.append({
             'timestamp': time.time(), 'event': 'controller_start',
             'control_mode': CONTROL_MODE, 'old_path': '', 'new_path': self.active_path,
             'signal_a': '', 'signal_b': '',
             'reason': 'development default uses persistence unless SDN_ACTIVE_MODEL is set',
         })
+        if self._topnotch:
+            baseline_rmse = model_info.get('model_rmse')
+            if baseline_rmse is None:
+                env_baseline = os.getenv('SDN_DRIFT_BASELINE_RMSE')
+                baseline_rmse = float(env_baseline) if env_baseline else None
+            if baseline_rmse:
+                self.drift_monitor = DriftMonitor(
+                    baseline_rmse=float(baseline_rmse),
+                    window=int(os.getenv('SDN_DRIFT_WINDOW', '30')),
+                    factor=float(os.getenv('SDN_DRIFT_FACTOR', '1.5')),
+                    consecutive_windows=int(os.getenv('SDN_DRIFT_CONSECUTIVE', '3')))
+                self.logger.info("Drift monitor armed: baseline RMSE=%s", baseline_rmse)
+            try:
+                portable = os.path.join(PROJECT_ROOT, 'cnt-ml', 'models', 'gbdt_portable.json')
+                if os.path.exists(portable):
+                    self._feature_importance = portable_gbdt_importance(portable)
+            except Exception as error:
+                self.logger.info("Feature importance unavailable: %s", error)
+        self._track_pairs = bool(self.drift_monitor is not None
+                                 or getattr(self, 'conformal', None) is not None
+                                 or getattr(self, 'detectors', None))
+        self.prediction_horizon = float(model_info.get('prediction_horizon_seconds') or 5)
         self.logger.info("Delay uses causal ping RTT, maximum age 1.5 seconds; uncovered learned inference is skipped")
         self.path_file_thread = hub.spawn(self._monitor_path_file)
         self.telemetry_thread = hub.spawn(self._monitor_telemetry)
@@ -142,7 +244,9 @@ class PathSwitchController(app_manager.RyuApp):
         name = SWITCH_NAMES.get(dpid, dpid)
         self.logger.info("Switch connected: %s (dpid=%s)", name, dpid)
         self.add_flow(datapath, 0, self._match(datapath), self._actions_output(datapath, datapath.ofproto.OFPP_CONTROLLER))
-        if dpid == 1:
+        if CONTROL_MODE == 'ecmp' and dpid in (1, 4):
+            self._install_ecmp(datapath)
+        elif dpid == 1:
             self._install_s1_flows(datapath)
         elif dpid == 4:
             self._install_s4_flows(datapath)
@@ -175,6 +279,161 @@ class PathSwitchController(app_manager.RyuApp):
             owner = self.route_adapter.message_owners.get(key)
             if owner is not None:
                 self.route_transition.error(owner, detail)
+
+    def _install_ecmp(self, datapath):
+        """ECMP baseline: OVS SELECT group hashing flows over both paths.
+
+        Bucket weights are proportional to the configured path capacities —
+        derived from SDN_PATH_*_CAPACITY_MBPS, not fixed numbers.
+        """
+        parser, ofp = datapath.ofproto_parser, datapath.ofproto
+        port_map = S1_PATH_PORT if datapath.id == 1 else S4_PATH_PORT
+        smallest = min(PATH_CAPACITY_MBPS.values())
+        buckets = []
+        for path in ('A', 'B'):
+            weight = max(1, int(round(PATH_CAPACITY_MBPS[path] / smallest * 10)))
+            buckets.append(parser.OFPBucket(weight=weight,
+                           actions=[parser.OFPActionOutput(port_map[path])]))
+        datapath.send_msg(parser.OFPGroupMod(datapath, ofp.OFPGC_ADD,
+                                             ofp.OFPGT_SELECT, 1, buckets))
+        inst = [parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS,
+                                             [parser.OFPActionGroup(1)])]
+        datapath.send_msg(parser.OFPFlowMod(
+            datapath=datapath, priority=10,
+            match=parser.OFPMatch(in_port=1), instructions=inst))
+        self.logger.info("ECMP SELECT group installed on s%s (weights from capacities)", datapath.id)
+
+    @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
+    def port_status_handler(self, ev):
+        if not self._topnotch:
+            return
+        msg = ev.msg
+        datapath = msg.datapath
+        if datapath.id != 1 or msg.desc.port_no not in S1_PORT_LINK:
+            return
+        path, link_id = S1_PORT_LINK[msg.desc.port_no]
+        ofp = datapath.ofproto
+        is_down = (msg.reason == ofp.OFPPR_DELETE
+                   or bool(msg.desc.state & ofp.OFPPS_LINK_DOWN))
+        now = time.time()
+        if is_down and link_id not in self._down_links:
+            self._down_links.add(link_id)
+            self.failure_tracker.link_down(link_id, now, affected_paths=(path,))
+            self.failure_recorder.append({
+                'timestamp': now, 'event': 'link_down', 'link_id': link_id,
+                'path': path, 'active_path': self.active_path,
+                'detail': 'port status reason=%s' % msg.reason})
+            self.logger.error("Link failure: %s (path %s)", link_id, path)
+            if path == self.active_path:
+                alternative = 'B' if path == 'A' else 'A'
+                alt_link = S1_PORT_LINK[S1_PATH_PORT[alternative]]
+                if alt_link[1] not in self._down_links:
+                    self.switch_path(alternative,
+                                     reason='link failure on %s' % link_id)
+        elif not is_down and link_id in self._down_links:
+            self._down_links.discard(link_id)
+            record = self.failure_tracker.link_up(link_id, now)
+            self.failure_recorder.append({
+                'timestamp': now, 'event': 'link_up', 'link_id': link_id,
+                'path': path, 'active_path': self.active_path,
+                'detail': 'recovered=%s' % (record is not None)})
+            self.logger.info("Link restored: %s", link_id)
+
+    def _log_explanation(self, now, source, reason, signals, candidate):
+        if not self._topnotch:
+            return
+        try:
+            ranges = self.confidence.bounds if self.confidence is not None else None
+            explanation = build_explanation(
+                timestamp=now, active_path=self.active_path, candidate=candidate,
+                source=source, reason=reason, signals=signals,
+                predictions=dict(self.latest_predictions),
+                intervals=dict(self.latest_intervals),
+                features=self._last_features.get(self.active_path),
+                feature_ranges=ranges, importance=self._feature_importance,
+                threshold=self.reroute_policy.congestion_threshold)
+            self.explanation_recorder.append(explanation_csv_row(explanation))
+        except Exception as error:
+            self.logger.info("Explanation logging skipped: %s", error)
+
+    def _tail_risk_prediction(self, features):
+        quantile_level = os.getenv('SDN_TAIL_RISK_QUANTILE')
+        if not quantile_level:
+            return None
+        try:
+            if self._quantile_models is None:
+                import joblib
+                artifact = os.getenv('SDN_QUANTILE_ARTIFACT', os.path.join(
+                    PROJECT_ROOT, 'cnt-ml', 'models', 'quantile_gbdt.joblib'))
+                if not os.path.exists(artifact):
+                    self._quantile_models = {}
+                    return None
+                self._quantile_models = joblib.load(artifact)
+            bundle = self._quantile_models
+            if not bundle:
+                return None
+            level = float(quantile_level)
+            model = bundle['models'].get(level)
+            if model is None:
+                return None
+            import pandas as pd
+            vector = pd.DataFrame([[float(features[name]) for name in bundle['features']]],
+                                  columns=bundle['features'], dtype=float)
+            return float(model.predict(vector)[0])
+        except Exception as error:
+            self.logger.info("Tail-risk prediction unavailable: %s", error)
+            return None
+
+    def _observe_drift(self, path, now, actual):
+        if not self._topnotch or not self._track_pairs:
+            return
+        pending = self._pending_predictions[path]
+        while pending and now - pending[0][0] >= self.prediction_horizon:
+            _, predicted = pending.pop(0)
+            if self.conformal is not None:
+                self.conformal.update(predicted, actual)
+                self._recent_residuals.append(abs(predicted - actual))
+                if self.drift_adaptation == 'online' and len(self._recent_residuals) >= 10:
+                    import math as _math
+                    ordered = sorted(self._recent_residuals)
+                    rank = min(len(ordered), max(1, _math.ceil(
+                        (len(ordered) + 1) * self.conformal.nominal_coverage)))
+                    self.conformal.set_adapted_radius(ordered[rank - 1])
+            for name, detector in self.detectors.items():
+                if detector.observe(abs(predicted - actual)) and name not in self._detector_fired:
+                    self._detector_fired.add(name)
+                    self.control_event_recorder.append({
+                        'timestamp': now, 'event': 'drift_detector_' + name,
+                        'control_mode': CONTROL_MODE, 'old_path': '', 'new_path': '',
+                        'signal_a': '', 'signal_b': '',
+                        'reason': '%s detector fired on forecast-error stream (path %s)' % (name, path)})
+                    self.logger.error("Drift detector fired: %s", name)
+            if self.drift_monitor is None:
+                continue
+            result = self.drift_monitor.observe(predicted, actual, timestamp=now)
+            if result is None:
+                continue
+            self.drift_recorder.append({
+                'timestamp': now, 'n': result['n'], 'mae': result['mae'],
+                'rmse': result['rmse'], 'bias': result['bias'],
+                'baseline_rmse': result['baseline_rmse'],
+                'threshold_rmse': result['threshold_rmse'],
+                'drifting': result['drifting'],
+                'drift_detected': result['drift_detected']})
+            if result['drift_detected'] and not self._drift_reported:
+                self._drift_reported = True
+                artifact = write_recalibration_artifact(
+                    self.drift_monitor.pairs(),
+                    os.getenv('SDN_RECALIBRATION_PATH', os.path.join(
+                        PROJECT_ROOT, 'cnt-ml', 'results', 'recalibration.json')))
+                self.control_event_recorder.append({
+                    'timestamp': now, 'event': 'drift_detected',
+                    'control_mode': CONTROL_MODE, 'old_path': '', 'new_path': '',
+                    'signal_a': '', 'signal_b': '',
+                    'reason': 'window RMSE %s > %s x baseline; recalibration radius=%s from %s pairs'
+                              % (result['rmse'], result['threshold_rmse'],
+                                 artifact['radius_percentage_points'], artifact['rows'])})
+                self.logger.error("Prediction drift detected; recalibration artifact written")
 
     def _monitor_transition(self):
         while True:
@@ -263,10 +522,38 @@ class PathSwitchController(app_manager.RyuApp):
         self.flow_counts.update(counts)
 
     @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
+    def _record_all_links(self, ev, now):
+        dpid = ev.msg.datapath.id
+        for stat in ev.msg.body:
+            endpoint = (dpid, stat.port_no)
+            info = self.link_map.get(endpoint)
+            if info is None or endpoint not in self._canonical_reporters:
+                continue
+            capacity = link_capacity_mbps(info, PATH_CAPACITY_MBPS,
+                                          DEFAULT_LINK_CAPACITY_MBPS)
+            sample = self.all_link_tracker.observe(
+                timestamp=now,
+                link_id=info['link_id'],
+                capacity_mbps=capacity,
+                rx_bytes=stat.rx_bytes,
+                tx_bytes=stat.tx_bytes,
+                rx_packets=stat.rx_packets,
+                tx_packets=stat.tx_packets,
+                rx_dropped=stat.rx_dropped,
+                tx_dropped=stat.tx_dropped,
+                active_flows=0,
+            )
+            if sample is None:
+                continue
+            rtt = self.rtt.at(now)
+            sample['delay'] = rtt if rtt is not None else ''
+            self.all_links_recorder.append(sample)
+
     def port_stats_reply_handler(self, ev):
+        now = time.time()
+        self._record_all_links(ev, now)
         if ev.msg.datapath.id != 1:
             return
-        now = time.time()
         for stat in ev.msg.body:
             if stat.port_no not in S1_PORT_LINK:
                 continue
@@ -285,6 +572,24 @@ class PathSwitchController(app_manager.RyuApp):
             )
             if sample is None:
                 continue
+            if self._topnotch:
+                self.failure_tracker.note_sample(now, sample['utilization'], sample['packet_loss'])
+                self._observe_drift(path, now, sample['utilization'])
+                mitigation = self.anomaly_detector.observe(link_id, sample['throughput'], now)
+                if mitigation is not None:
+                    self.control_event_recorder.append({
+                        'timestamp': now, 'event': 'anomaly_detected',
+                        'control_mode': CONTROL_MODE, 'old_path': self.active_path,
+                        'new_path': self.active_path,
+                        'signal_a': '', 'signal_b': '',
+                        'reason': '%s on %s z=%s share=%s baseline=%.2f Mbps'
+                                  % (mitigation['kind'], link_id, mitigation.get('z_score', ''),
+                                     mitigation.get('share', ''), mitigation['rate_mbps'])})
+                    self.logger.error("Traffic anomaly on %s: %s", link_id, mitigation['kind'])
+                    if self.anomaly_mitigation and path == self.active_path:
+                        alternative = 'B' if path == 'A' else 'A'
+                        if S1_PORT_LINK[S1_PATH_PORT[alternative]][1] not in self._down_links:
+                            self.switch_path(alternative, reason='anomaly mitigation: %s' % mitigation['kind'])
             rtt = self.rtt.at(now)
             sample['delay'] = rtt if rtt is not None else ''
             self.telemetry_recorder.append(sample)
@@ -342,11 +647,23 @@ class PathSwitchController(app_manager.RyuApp):
                     self._invalidate_prediction(path)
                 self.logger.exception("Prediction failed for %s: %s", link_id, error)
                 continue
+            tail = self._tail_risk_prediction(features) if self._topnotch else None
+            if tail is not None:
+                self.logger.info("Tail-risk routing: P%s forecast %.2f%% replaces point %.2f%%",
+                                 os.getenv('SDN_TAIL_RISK_QUANTILE'), tail, prediction)
+                prediction = min(100.0, max(0.0, tail))
             self.latest_predictions[path] = prediction
             self.latest_prediction_times[path] = now
-            if CONFIDENCE_GATE:
-                interval = self.confidence.interval(prediction, features,
-                    threshold=self.reroute_policy.congestion_threshold)
+            if self._topnotch:
+                self._last_features[path] = features
+                if self._track_pairs:
+                    self._pending_predictions[path].append((now, prediction))
+            if CONFIDENCE_GATE or (self._topnotch and self.conformal is not None):
+                if self._topnotch and self.conformal is not None:
+                    interval = self.conformal.interval(prediction, features)
+                else:
+                    interval = self.confidence.interval(prediction, features,
+                        threshold=self.reroute_policy.congestion_threshold)
                 self.latest_intervals[path] = interval
                 self.confidence_recorder.append({
                     'timestamp': now, 'path': path, 'prediction': prediction,
@@ -379,7 +696,7 @@ class PathSwitchController(app_manager.RyuApp):
             self.reroute_policy.reset()
 
     def _evaluate_reroute(self, now):
-        if CONTROL_MODE == 'static':
+        if CONTROL_MODE in ('static', 'ecmp'):
             return
         if SAFE_REROUTE or CONFIDENCE_GATE:
             if (self.last_policy_sample_time is not None
@@ -388,7 +705,7 @@ class PathSwitchController(app_manager.RyuApp):
             self.last_policy_sample_time = now
         if SAFE_REROUTE and self.route_transition.busy:
             return
-        if CONFIDENCE_GATE:
+        if CONFIDENCE_GATE or (self._topnotch and self.conformal is not None):
             freshness = max(3.0, MONITOR_INTERVAL_SECONDS * 3)
             if (not {'A', 'B'}.issubset(self.latest_utilizations)
                     or any(now - self.latest_utilization_times[p] > freshness for p in ('A', 'B'))):
@@ -425,6 +742,8 @@ class PathSwitchController(app_manager.RyuApp):
                 'candidate_count': self.reroute_policy._candidate_count,
                 'transition_state': self.route_transition.state if SAFE_REROUTE else 'direct',
             })
+            self._log_explanation(now, decision['source'], decision['reason'],
+                                  projected or {}, new_path)
             if new_path:
                 self.switch_path(new_path, reason='%s: %s' % (decision['source'], decision['reason']))
             return
@@ -457,6 +776,8 @@ class PathSwitchController(app_manager.RyuApp):
                 'candidate': new_path or '', 'candidate_count': self.reroute_policy._candidate_count,
                 'transition_state': self.route_transition.state,
             })
+        self._log_explanation(now, CONTROL_MODE, 'projected policy evaluation',
+                              projected_signals, new_path)
         if new_path is not None:
             reason = (
                 "%s projected policy A=%.2f%% B=%.2f%%"
@@ -487,6 +808,8 @@ class PathSwitchController(app_manager.RyuApp):
         self._commit_path(old_path, new_path, reason, self.last_control_signals)
 
     def _commit_path(self, old_path, new_path, reason, signals):
+        if self._topnotch:
+            self.failure_tracker.note_reroute(time.time(), old_path, new_path)
         self.active_path = new_path
         if SAFE_REROUTE:
             self.reroute_policy.commit(time.time())

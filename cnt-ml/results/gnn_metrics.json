@@ -1,0 +1,30 @@
+{
+  "links": [
+    "S1-S2",
+    "S1-S3"
+  ],
+  "horizon_steps": 5,
+  "train_snapshots": 63,
+  "test_snapshots": 28,
+  "initial_loss": 1.1469,
+  "final_loss": 0.9696,
+  "gnn": {
+    "mae": 25.8067,
+    "rmse": 26.829
+  },
+  "persistence": {
+    "mae": 14.8745,
+    "rmse": 26.1071
+  },
+  "ridge_same_features": {
+    "mae": 27.0801,
+    "rmse": 32.1424
+  },
+  "diebold_mariano_gnn_vs_persistence": {
+    "n": 56,
+    "mean_loss_diff": 38.2178,
+    "dm_stat": 0.1407,
+    "p_value": 0.888142,
+    "significant_5pct": false
+  }
+}

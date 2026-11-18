@@ -4,7 +4,7 @@ const systems = ['static', 'reactive', 'predictive-baseline', 'predictive-ml'];
 let state, run, system = 'predictive-ml', runId = 'run-01', elapsed = 40, playing = false, generation = 0, lastFrame;
 let viewingLive=false, liveState, liveId='', liveRefreshing=false, activeLiveId='', liveActionPending=false;
 let researchState={groups:[]};
-const liveLabels={'predictive-safe':'GB + confidence + safe','predictive-confidence':'GB + confidence','predictive-safe-only':'GB + safe'};
+const liveLabels={'predictive-safe':'GB + confidence + safe','predictive-confidence':'GB + confidence','predictive-safe-only':'GB + safe','ecmp':'ECMP'};
 const escapeText=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const primary = [['P95_Latency_ms','P95 RTT','ms'],['Average_Throughput_Mbps','Goodput','Mbps'],['Average_Packet_Loss_pct','Packet loss','%'],['Congestion_Duration_seconds','Congestion','s']];
 const number = (value, digits=2) => Number.isFinite(value) ? value.toFixed(digits) : '—';
@@ -23,9 +23,29 @@ async function refreshState() {
     if(state.issues.length) error('Some captures need review and are excluded from these results.');
     renderComparison();
     await refreshResearch();
+    await refreshTopnotch();
     if(!viewingLive && !run) await chooseSystem(system);
     else if(!viewingLive && run.live) await loadRun();
   } catch (e) { error('The local data service is unavailable. Reload after restarting the project.'); }
+}
+async function refreshTopnotch(){
+  try{
+    const data=await api('/api/topnotch');
+    const latest=(data.explanations||[]).at(-1);
+    if(latest){
+      $('#explain-decision').textContent=latest.candidate?`Path ${latest.active_path} → ${latest.candidate} · ${String(latest.reason||'').replaceAll('_',' ')}`:`Stayed on path ${latest.active_path} · ${String(latest.reason||'').replaceAll('_',' ')}`;
+      $('#explain-features').textContent=latest.top_features?`Top contributing features: ${latest.top_features}`:'No feature attribution for this decision';
+    }
+    const drift=(data.drift||[]).at(-1);
+    if(drift){
+      const detected=drift.drift_detected==='True'||drift.drift_detected==='true';
+      $('#drift-summary').textContent=`RMSE ${number(Number(drift.rmse))} vs baseline ${number(Number(drift.baseline_rmse))}`;
+      $('#drift-status').textContent=detected?'Drift detected · recalibration written':'No drift detected';
+    }
+    const failures=data.failures||[];
+    const downs=failures.filter(f=>f.event==='link_down').length;
+    $('#failure-summary').textContent=failures.length?`${downs} link-down event(s) logged`:'No failures logged';
+  }catch{ /* Live insight logs appear after the first top-notch controller run. */ }
 }
 async function refreshResearch(){
   try{

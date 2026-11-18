@@ -9,7 +9,7 @@ import sys
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--system', choices=['static', 'reactive', 'predictive-baseline', 'predictive-ml',
-                        'predictive-safe', 'predictive-confidence', 'predictive-safe-only'], required=True)
+                        'predictive-safe', 'predictive-confidence', 'predictive-safe-only', 'ecmp'], required=True)
     parser.add_argument('--scenario', default='legacy')
     parser.add_argument('--topology', choices=['diamond4', 'access6'], default='diamond4')
     parser.add_argument('--repetition', type=int, default=1)
