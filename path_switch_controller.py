@@ -10,6 +10,7 @@ from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib import hub
 from ryu.lib.packet import packet, ethernet
+from ryu.lib.packet import ipv4, tcp, udp
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 ML_SRC = os.path.join(PROJECT_ROOT, 'cnt-ml', 'src')
@@ -29,9 +30,20 @@ try:
     from anomaly_mitigation import SurgeDetector
     from conformal_runtime import ConformalRuntime
     from drift_adaptation import AdwinLite, PageHinkley
+    from qos_policy import class_for_dscp, load_qos_policy, meter_bands
+    from acl_firewall import load_acl, protocol_name
+    from link_latency import LatencyTracker
+    from slicing import load_slices
     TOPNOTCH_AVAILABLE = True
-except Exception:  # New modules are additive; legacy modes must still run.
+    TOPNOTCH_IMPORT_ERROR = None
+except Exception as _topnotch_error:  # Modules are additive; legacy modes run.
+    # Never swallow this silently: a missing/broken module copy in the live
+    # guest would otherwise disable every flagship feature while the run
+    # looks normal. The error is logged at startup and recorded in the
+    # controller_start control event (see __init__).
     TOPNOTCH_AVAILABLE = False
+    TOPNOTCH_IMPORT_ERROR = '%s: %s' % (type(_topnotch_error).__name__,
+                                        _topnotch_error)
 
 from telemetry_runtime import (
     CONTROL_EVENT_FIELDS,
@@ -70,6 +82,11 @@ TRANSITION_FIELDS = ['timestamp', 'transition_id', 'stage', 'status', 'old_path'
 FAILURE_FIELDS = ['timestamp', 'event', 'link_id', 'path', 'active_path', 'detail']
 DRIFT_FIELDS = ['timestamp', 'n', 'mae', 'rmse', 'bias', 'baseline_rmse', 'threshold_rmse',
                 'drifting', 'drift_detected']
+LATENCY_FIELDS = ['timestamp', 'link_id', 'latency_ms']
+QOS_ENABLED = os.getenv('SDN_QOS', '0') == '1'
+QOS_POLICY_PATH = os.getenv('SDN_QOS_POLICY_PATH', '').strip() or None
+ACL_PATH = os.getenv('SDN_ACL_PATH', '').strip() or None
+SLICES_PATH = os.getenv('SDN_SLICES_PATH', '').strip() or None
 TELEMETRY_PATH = os.getenv(
     'SDN_TELEMETRY_CSV',
     os.path.join(PROJECT_ROOT, 'cnt-ml', 'data', 'raw', 'telemetry_live.csv'),
@@ -152,14 +169,24 @@ class PathSwitchController(app_manager.RyuApp):
         )
         # --- Top-notch extension state (all derived, nothing hardcoded) ---
         self._topnotch = TOPNOTCH_AVAILABLE
+        if not self._topnotch:
+            self.logger.error(
+                "TOP-NOTCH FEATURES DISABLED (import error: %s) - failure "
+                "recovery, drift monitoring, anomaly mitigation, explanations "
+                "and CN policy checks are OFF for this run",
+                TOPNOTCH_IMPORT_ERROR)
         self._pending_predictions = {'A': [], 'B': []}
         self._last_features = {}
         self._feature_importance = None
         self._down_links = set()
+        self.qos_policy = None
+        self.acl_engine = None
+        self.slice_manager = None
+        self.latency_tracker = None
         output_dir = os.path.dirname(CONTROL_EVENTS_PATH)
         if self._topnotch:
             self.failure_tracker = FailureRecoveryTracker(
-                recovery_threshold=float(os.getenv('SDN_CONGESTION_THRESHOLD', '85')))
+                recovery_threshold_pct=float(os.getenv('SDN_CONGESTION_THRESHOLD', '85')))
             self.failure_recorder = StructuredCsvRecorder(
                 os.getenv('SDN_FAILURES_CSV', os.path.join(output_dir, 'failures.csv')), FAILURE_FIELDS)
             self.explanation_recorder = StructuredCsvRecorder(
@@ -170,6 +197,21 @@ class PathSwitchController(app_manager.RyuApp):
             self.anomaly_detector = SurgeDetector(
                 z_threshold=float(os.getenv('SDN_ANOMALY_Z', '4')),
                 elephant_share=float(os.getenv('SDN_ELEPHANT_SHARE', '0.5')))
+            self.qos_policy = load_qos_policy(QOS_POLICY_PATH) if QOS_ENABLED else None
+            self.acl_engine = load_acl(ACL_PATH) if ACL_PATH else None
+            self.slice_manager = load_slices(SLICES_PATH) if SLICES_PATH else None
+            self.latency_tracker = LatencyTracker(
+                alpha=float(os.getenv('SDN_LATENCY_ALPHA', '0.25')),
+                stale_after_seconds=float(os.getenv('SDN_LATENCY_STALE_SECONDS', '30')))
+            self.latency_recorder = StructuredCsvRecorder(
+                os.getenv('SDN_LATENCY_CSV', os.path.join(output_dir, 'latency.csv')),
+                LATENCY_FIELDS)
+            self._path_links = {}
+            for info in self.link_map.values():
+                if info.get('path'):
+                    self._path_links.setdefault(info['path'], set()).add(info['link_id'])
+            self._path_links = {p: sorted(links) for p, links in self._path_links.items()}
+            self._last_latency_second = {}
             self.conformal = None
             if os.getenv('SDN_CONFORMAL', '0') == '1':
                 artifact = os.getenv('SDN_CONFORMAL_ARTIFACT', os.path.join(
@@ -206,7 +248,11 @@ class PathSwitchController(app_manager.RyuApp):
             'timestamp': time.time(), 'event': 'controller_start',
             'control_mode': CONTROL_MODE, 'old_path': '', 'new_path': self.active_path,
             'signal_a': '', 'signal_b': '',
-            'reason': 'development default uses persistence unless SDN_ACTIVE_MODEL is set',
+            'reason': 'topnotch=%s%s; development default uses persistence '
+                      'unless SDN_ACTIVE_MODEL is set' % (
+                          'enabled' if self._topnotch else 'DISABLED',
+                          '' if self._topnotch else
+                          ' (import error: %s)' % TOPNOTCH_IMPORT_ERROR),
         })
         if self._topnotch:
             baseline_rmse = model_info.get('model_rmse')
@@ -244,6 +290,8 @@ class PathSwitchController(app_manager.RyuApp):
         name = SWITCH_NAMES.get(dpid, dpid)
         self.logger.info("Switch connected: %s (dpid=%s)", name, dpid)
         self.add_flow(datapath, 0, self._match(datapath), self._actions_output(datapath, datapath.ofproto.OFPP_CONTROLLER))
+        if self.qos_policy is not None:
+            self._install_qos_meters(datapath)
         if CONTROL_MODE == 'ecmp' and dpid in (1, 4):
             self._install_ecmp(datapath)
         elif dpid == 1:
@@ -475,6 +523,69 @@ class PathSwitchController(app_manager.RyuApp):
         mod = parser.OFPFlowMod(datapath=datapath, priority=priority, match=match, instructions=inst)
         datapath.send_msg(mod)
 
+    def _install_qos_meters(self, datapath):
+        parser = datapath.ofproto_parser
+        ofproto = datapath.ofproto
+        for band in meter_bands(self.qos_policy, LINK_CAPACITY_MBPS):
+            bands = [parser.OFPMeterBandDrop(rate=band['rate_kbps'],
+                                             burst_size=band['burst_kbit'])]
+            datapath.send_msg(parser.OFPMeterMod(
+                datapath=datapath, command=ofproto.OFPMC_ADD,
+                flags=ofproto.OFPMF_KBPS | ofproto.OFPMF_BURST,
+                meter_id=band['meter_id'], bands=bands))
+
+    def add_flow_metered(self, datapath, priority, match, actions, meter_id):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        inst = [parser.OFPInstructionMeter(meter_id, ofproto.OFPIT_METER),
+                parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
+        mod = parser.OFPFlowMod(datapath=datapath, priority=priority,
+                                match=match, instructions=inst)
+        datapath.send_msg(mod)
+
+    def _install_drop(self, datapath, in_port, eth):
+        self.add_flow(datapath, 20,
+                      self._match(datapath, in_port=in_port,
+                                  eth_src=eth.src, eth_dst=eth.dst), [])
+
+    def _cn_event(self, event, reason):
+        self.control_event_recorder.append({
+            'timestamp': time.time(), 'event': event,
+            'control_mode': CONTROL_MODE, 'old_path': self.active_path,
+            'new_path': self.active_path, 'signal_a': '', 'signal_b': '',
+            'reason': reason})
+        self.logger.error('CN policy: %s (%s)', event, reason)
+
+    def _cn_policy_check(self, datapath, pkt, eth, in_port):
+        """ACL + slicing + QoS for access-switch packet-ins.
+
+        Returns 'drop', a meter id, or None. A deny also installs a drop
+        flow so repeated packets stop reaching the controller.
+        """
+        ip = pkt.get_protocol(ipv4.ipv4)
+        if ip is None:
+            return None
+        if self.slice_manager is not None and \
+                self.slice_manager.isolation_decision(ip.src, ip.dst) == 'deny':
+            self._install_drop(datapath, in_port, eth)
+            self._cn_event('slice_isolation_drop',
+                           '%s -> %s crosses slice boundary' % (ip.src, ip.dst))
+            return 'drop'
+        if self.acl_engine is not None:
+            segment = pkt.get_protocol(tcp.tcp) or pkt.get_protocol(udp.udp)
+            src_port = segment.src_port if segment is not None else None
+            dst_port = segment.dst_port if segment is not None else None
+            action, rule_index = self.acl_engine.evaluate(
+                ip.src, ip.dst, protocol_name(ip.proto), src_port, dst_port)
+            if action == 'deny':
+                self._install_drop(datapath, in_port, eth)
+                self._cn_event('acl_drop', 'rule %s denied %s -> %s %s'
+                               % (rule_index, ip.src, ip.dst, protocol_name(ip.proto)))
+                return 'drop'
+        if self.qos_policy is not None:
+            return class_for_dscp(self.qos_policy, ip.tos >> 2).get('meter_id')
+        return None
+
     def modify_flow(self, datapath, priority, match, actions):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -521,7 +632,6 @@ class PathSwitchController(app_manager.RyuApp):
                         counts[port] += 1
         self.flow_counts.update(counts)
 
-    @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
     def _record_all_links(self, ev, now):
         dpid = ev.msg.datapath.id
         for stat in ev.msg.body:
@@ -549,6 +659,7 @@ class PathSwitchController(app_manager.RyuApp):
             sample['delay'] = rtt if rtt is not None else ''
             self.all_links_recorder.append(sample)
 
+    @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
     def port_stats_reply_handler(self, ev):
         now = time.time()
         self._record_all_links(ev, now)
@@ -593,6 +704,19 @@ class PathSwitchController(app_manager.RyuApp):
             rtt = self.rtt.at(now)
             sample['delay'] = rtt if rtt is not None else ''
             self.telemetry_recorder.append(sample)
+            if self._topnotch and self.latency_tracker is not None and rtt is not None:
+                links = self._path_links.get(path, [])
+                if links:
+                    self.latency_tracker.observe_path_rtt(links, rtt, now)
+                    second = int(now)
+                    for link_id in links:
+                        if self._last_latency_second.get(link_id) != second:
+                            self._last_latency_second[link_id] = second
+                            estimate = self.latency_tracker.latency_ms(link_id, now)
+                            if estimate is not None:
+                                self.latency_recorder.append({
+                                    'timestamp': now, 'link_id': link_id,
+                                    'latency_ms': round(estimate, 3)})
             self.latest_utilizations[path] = sample['utilization']
             self.latest_utilization_times[path] = now
             features = self.feature_history.update(sample)
@@ -839,9 +963,18 @@ class PathSwitchController(app_manager.RyuApp):
         in_port = msg.match['in_port']
         if dpid in (5, 6):
             datapath = msg.datapath
-            eth = packet.Packet(msg.data).get_protocol(ethernet.ethernet)
+            pkt = packet.Packet(msg.data)
+            eth = pkt.get_protocol(ethernet.ethernet)
             if eth is None or eth.ethertype == 0x88cc:
                 return
+            meter_id = None
+            if self._topnotch and (self.acl_engine is not None
+                                   or self.slice_manager is not None
+                                   or self.qos_policy is not None):
+                verdict = self._cn_policy_check(datapath, pkt, eth, in_port)
+                if verdict == 'drop':
+                    return
+                meter_id = verdict
             table = self.mac_to_port.setdefault(dpid, {})
             table[eth.src] = in_port
             out_port = table.get(eth.dst, datapath.ofproto.OFPP_FLOOD)
@@ -849,7 +982,11 @@ class PathSwitchController(app_manager.RyuApp):
                 return
             actions = self._actions_output(datapath, out_port)
             if out_port != datapath.ofproto.OFPP_FLOOD:
-                self.add_flow(datapath, 10, self._match(datapath, in_port=in_port, eth_dst=eth.dst), actions)
+                flow_match = self._match(datapath, in_port=in_port, eth_dst=eth.dst)
+                if meter_id:
+                    self.add_flow_metered(datapath, 10, flow_match, actions, meter_id)
+                else:
+                    self.add_flow(datapath, 10, flow_match, actions)
             data = msg.data if msg.buffer_id == datapath.ofproto.OFP_NO_BUFFER else None
             datapath.send_msg(datapath.ofproto_parser.OFPPacketOut(
                 datapath=datapath, buffer_id=msg.buffer_id, in_port=in_port,

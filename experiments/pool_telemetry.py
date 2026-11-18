@@ -32,6 +32,9 @@ def pool_rows(capture_dirs, filename="telemetry_all_links.csv"):
     last_stamp = None
     for directory in capture_dirs:
         path = os.path.join(directory, filename)
+        if not os.path.exists(path):
+            counts[directory] = 0  # pre-all-link capture; nothing to pool
+            continue
         with open(path, newline="", encoding="utf-8") as handle:
             rows = list(csv.DictReader(handle))
         if not rows:

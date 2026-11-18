@@ -16,3 +16,6 @@ venv/
 
 # OS files
 .DS_Store
+
+# Campaign-03 supervisor scratch (live VM session files)
+work/campaign-03/session/

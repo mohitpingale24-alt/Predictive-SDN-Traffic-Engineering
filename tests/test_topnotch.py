@@ -83,6 +83,44 @@ def test_failure_recovery_measures_from_events():
     assert report["max_packet_loss_during_outage_pct"] == 12
 
 
+def test_completed_report_sees_reroute_and_recovery_timings():
+    # Regression: completed_reports() used to read a snapshot copy taken at
+    # link_down time, so every timing came back None.
+    tracker = FailureRecoveryTracker(recovery_threshold_pct=85)
+    tracker.link_down("S1-S2", 0.0, affected_paths=("A",))
+    tracker.note_sample(1.0, utilization_pct=95, packet_loss_pct=20)
+    tracker.note_reroute(2.5, "A", "B")
+    tracker.note_sample(4.0, utilization_pct=90, packet_loss_pct=40)
+    tracker.note_sample(6.0, utilization_pct=80, packet_loss_pct=0)
+    tracker.link_up("S1-S2", 10.0)
+    reports = tracker.completed_reports()
+    assert len(reports) == 1
+    report = reports[0]
+    assert report["up_at"] == 10.0
+    assert report["time_to_reroute_seconds"] == 2.5
+    assert report["time_to_recover_seconds"] == 6.0
+    assert report["reroute_from"] == "A" and report["reroute_to"] == "B"
+    assert report["mean_packet_loss_during_outage_pct"] == 20.0
+    assert report["max_packet_loss_during_outage_pct"] == 40.0
+
+
+def test_completed_reports_exclude_open_outages():
+    # Regression: the old filter compared event dicts (with an extra
+    # 'event' key) against live records, so it never matched and open
+    # outages were reported as completed.
+    tracker = FailureRecoveryTracker(recovery_threshold_pct=85)
+    tracker.link_down("S1-S2", 0.0)
+    tracker.link_up("S1-S2", 5.0)
+    tracker.link_down("S1-S3", 6.0)  # still open
+    assert len(tracker.completed_reports()) == 1
+    assert tracker.completed_reports()[0]["link_id"] == "S1-S2"
+    # A second outage on the same link must not hide the first completed one.
+    tracker.link_down("S1-S2", 7.0)
+    completed = tracker.completed_reports()
+    assert [r["link_id"] for r in completed] == ["S1-S2"]
+    assert completed[0]["down_at"] == 0.0
+
+
 def test_drift_needs_consecutive_windows_and_recalibrates():
     monitor = DriftMonitor(baseline_rmse=2.0, window=10, factor=1.5, consecutive_windows=2)
     result = None

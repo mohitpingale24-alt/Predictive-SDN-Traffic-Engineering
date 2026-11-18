@@ -24,6 +24,7 @@ async function refreshState() {
     renderComparison();
     await refreshResearch();
     await refreshTopnotch();
+    await refreshShowcase();
     if(!viewingLive && !run) await chooseSystem(system);
     else if(!viewingLive && run.live) await loadRun();
   } catch (e) { error('The local data service is unavailable. Reload after restarting the project.'); }
@@ -46,6 +47,161 @@ async function refreshTopnotch(){
     const downs=failures.filter(f=>f.event==='link_down').length;
     $('#failure-summary').textContent=failures.length?`${downs} link-down event(s) logged`:'No failures logged';
   }catch{ /* Live insight logs appear after the first top-notch controller run. */ }
+}
+async function refreshShowcase(){
+  try{
+    const d=await api('/api/showcase');
+    if(window.renderShowcase){ window.renderShowcase(d); return; }
+    const cards=[];
+    const card=(title,state,headline,detail,extra)=>cards.push(Object.assign({title,state,headline,detail},extra||{}));
+    const num=number;
+    const p=d.platform||{}; const start=p.start;
+    const pStatus=p.start_status||(start?(String(start.reason||'').includes('DISABLED')?'disabled':'enabled'):null);
+    card('Extension platform', start?(pStatus==='disabled'?'off':'live'):'no data',
+      start?'Controller extensions '+(pStatus==='disabled'?'DISABLED':pStatus==='enabled'?'enabled':'recorded'):'No controller run recorded yet',
+      start?String(start.reason||''):'Start a live experiment and this fills in.',
+      {stats:[['Live runs recorded',p.live_runs],['Campaign runs recorded',p.campaign_runs],['Controller starts logged',p.starts],['Starts · live / campaign',(p.starts_live??'—')+' / '+(p.starts_campaign??'—')],['Reroutes · live / campaign',(p.reroutes_live??'—')+' / '+(p.reroutes_campaign??'—')]],
+       href:'/platform',openLabel:'Open the full platform record',
+       source:'Source: control_events.csv from live captures + campaign-02'+(p.start_run?' · latest start: '+String(p.start_run).replace('run-','').slice(0,13)+(p.start_source?' ('+p.start_source+')':''):'')});
+    const ex=d.explanations||{}; const reasons=Object.entries(ex.reasons||{}).sort((a,b)=>b[1]-a[1]);
+    card('Explainable decisions', ex.latest?'live':'no data',
+      ex.latest?('Latest: path '+(ex.latest.active_path||'?')+' · '+String(ex.latest.reason||'').replaceAll('_',' ')):'No decisions explained yet',
+      ex.latest?('Top features: '+(ex.latest.top_features||'n/a')):'Every decision writes its reasons to explanations.csv.',
+      {stats:[['Decisions explained',ex.count||0],['Most common reason',reasons.length?reasons[0][0].replaceAll('_',' ')+' × '+reasons[0][1]:'—'],['Top feature overall',ex.top_feature||'—'],['Runs contributing',ex.runs_contributing??'—'],['With forecast / interval',(ex.with_prediction??'—')+' / '+(ex.with_interval??'—')]],
+       compare:reasons.length?{title:'Decision reasons',items:reasons.slice(0,3).map(([k,v])=>[k.replaceAll('_',' '),v,''])}:null,
+       href:'/explainability',openLabel:'Open the full explainability record',
+       source:'Source: explanations.csv across all live captures'});
+    const dr=d.drift||{}; const drEvents=Object.entries(dr.events||{}); const drTotal=drEvents.reduce((n,[,v])=>n+v,0); const fc=dr.forecast;
+    card('Drift monitoring', (drTotal||fc||dr.latest)?'live':'no data',
+      drTotal?drTotal+' drift detector firing(s) in live runs':(fc?'Forecast error tracked over '+fc.n+' recorded predictions':'No drift data yet'),
+      dr.latest_event?('Latest: '+dr.latest_event):'ADWIN + Page-Hinkley watch the forecast-error stream live.',
+      {stats:drEvents.map(([k,v])=>[k.replace('drift_detector_','').replaceAll('_',' '),v+' firing(s)']),
+       compare:fc?{title:'Forecast RMSE · first half vs second half of campaign-02',items:[['First half',Number(fc.rmse_first),' pts'],['Second half',Number(fc.rmse_second),' pts']]}:null,
+       href:'/drift',openLabel:'Open the full drift record',
+       source:'Source: live drift events + campaign-02 predictions paired with telemetry at +5 s'});
+    const f=d.failures||{}; const tr=f.transitions||{}; const rb=Object.entries(f.reroutes_by_system||{});
+    const rbLabels={static:'Static',reactive:'Reactive','predictive-baseline':'Persistence','predictive-ml':'Predictive GB'};
+    card('Failure recovery', (tr.completed||f.downs)?'live':'armed',
+      (tr.completed||0)+' reroute transition(s) completed · '+(tr.failed||0)+' failed',
+      tr.latest?('Latest stage: '+(tr.latest.stage||'')+' / '+(tr.latest.status||'')):'Port-status events drive reroute + recovery timing (failures.csv).',
+      {stats:[['Link-down events (live)',f.downs||0],['Mean transition time',tr.mean_seconds!=null?num(Number(tr.mean_seconds))+' s':'—']],
+       compare:rb.length?{title:'Recorded reroutes per system · campaign-02 (8 runs each)',items:rb.map(([k,v])=>[rbLabels[k]||k,v,''])}:null,
+       href:'/recovery',openLabel:'Open the full recovery record',
+       source:'Source: transitions.csv (live) + control_events.csv (campaign-02)'});
+    const an=d.anomalies||{}; const kinds=Object.entries(an.kinds||{}).sort((a,b)=>b[1]-a[1]);
+    card('Anomaly mitigation', an.count?'live':'armed',
+      (an.count||0)+' surge/elephant detection(s) in live runs',
+      an.latest?('Latest: '+an.latest):'Statistical detector (rolling z-score + traffic share).',
+      {stats:kinds.map(([k,v])=>[k.replaceAll('_',' '),v+' detection(s)']),
+       compare:kinds.length?{title:'Detection kinds',items:kinds.map(([k,v])=>[k.replaceAll('_',' '),v,''])}:null,
+       href:'/anomaly',openLabel:'Open the full anomaly record',
+       source:'Source: anomaly_detected events across all live captures'});
+    const cf=d.conformal||{}; const art=cf.artifact||{}; const live=cf.live||{}; const wp=Object.entries(live.width_by_path||{});
+    card('Conformal intervals', art.nominal_coverage?'live':'no data',
+      art.nominal_coverage?('Coverage guarantee '+num(Number(art.nominal_coverage)*100,0)+'% · radius '+num(Number(art.radius_percentage_points))+' pts'):'No calibration artifact yet',
+      art.empirical_coverage_on_calibration?('Calibrated on '+((art.provenance||{}).capture||'a recorded capture')+' · empirical coverage '+num(Number(art.empirical_coverage_on_calibration.coverage)*100,1)+'% at mean width '+num(Number(art.empirical_coverage_on_calibration.mean_width))):'Run calibrate_conformal.py to build the artifact.',
+      {stats:[['Calibration rows',art.calibration_rows!=null?art.calibration_rows:'—'],['Live intervals recorded',live.rows||0],['Gate held (too uncertain)',live.gate_hold||0],['Gate passed',live.gate_pass||0]],
+       compare:wp.length?{title:'Live mean interval width by path',items:wp.map(([k,v])=>['Path '+k,Number(v),' pts'])}:null,
+       href:'/conformal',openLabel:'Open the full conformal record',
+       source:'Source: conformal_calibration.json + confidence.csv from live runs'});
+    const latStats=Object.entries(d.latency_stats||{}); const lat=Object.entries(d.latency||{});
+    card('Per-link latency', lat.length?'live':'no data',
+      lat.length?lat.map(([k,v])=>k+' '+num(Number(v.latency_ms))+' ms').join(' · '):'No latency estimates yet',
+      'EWMA per link from live RTT probes; feeds delay-aware scoring (latency.csv).',
+      {stats:latStats.map(([k,v])=>[k+' mean',num(Number(v.mean))+' ms over '+v.count+' samples']),
+       compare:latStats.length?{title:'Mean latency by link',items:latStats.map(([k,v])=>[k,Number(v.mean),' ms'])}:null,
+       href:'/latency',openLabel:'Open the full latency record',
+       source:'Source: latency.csv across all live captures'});
+    const alStats=Object.entries(d.all_link_stats||{}); const al=Object.entries(d.all_links||{});
+    card('All-link telemetry', al.length?'live':'no data',
+      al.length?al.map(([k,v])=>k+' '+num(Number(v))+'%').join(' · '):'No all-link capture yet',
+      'Every core link recorded, not just s1 (telemetry_all_links.csv in each new capture).',
+      {stats:alStats.map(([k,v])=>[k+' peak',num(Number(v.peak),1)+'% · mean '+num(Number(v.mean),1)+'%']),
+       compare:alStats.length?{title:'Peak utilization by link',items:alStats.map(([k,v])=>[k,Number(v.peak),'%'])}:null,
+       href:'/telemetry',openLabel:'Open the full telemetry record',
+       source:'Source: telemetry_all_links.csv across all live captures'});
+    const g=d.gnn||{};
+    card('GNN forecaster', g.gnn?'live':'no data',
+      g.gnn?('GNN MAE '+num(Number(g.gnn.mae))+' vs persistence '+num(Number((g.persistence||{}).mae))):'No GNN evaluation yet',
+      g.diebold_mariano_gnn_vs_persistence?('DM test vs persistence: p = '+num(Number(g.diebold_mariano_gnn_vs_persistence.p_value),3)+' — not significant, persistence wins on this data (honest result).'):'Trained on pooled all-link telemetry.',
+      {stats:[['Train / test snapshots',(g.train_snapshots||'—')+' / '+(g.test_snapshots||'—')],['Training loss',num(Number(g.initial_loss),3)+' → '+num(Number(g.final_loss),3)]],
+       compare:g.gnn?{title:'MAE comparison (lower is better)',items:[['GNN',Number(g.gnn.mae),''],['Persistence',Number((g.persistence||{}).mae),''],['Ridge',Number((g.ridge_same_features||{}).mae),'']]}:null,
+       href:'/gnn',openLabel:'Open the full GNN record',
+       source:'Source: cnt-ml/results/gnn_metrics.json (recorded evaluation)'});
+    const mc=d.models_comparison||[]; const gb=mc.find(m=>String(m.model||'').includes('Gradient'));
+    card('Forecaster comparison', mc.length?'live':'no data',
+      gb?('Gradient Boosting RMSE '+num(Number(gb.rmse))+' · R² '+num(Number(gb.r2),3)):'No recorded model comparison',
+      'The recorded model selection behind the controller: GB picked on RMSE/R², persistence the honest MAE baseline.',
+      {stats:mc.map(m=>[m.model,'MAE '+num(Number(m.mae))+' · R² '+num(Number(m.r2),3)]),
+       compare:mc.length?{title:'RMSE comparison (lower is better)',items:mc.map(m=>[m.model,Number(m.rmse),''])}:null,
+       href:'/forecasters',openLabel:'Open the full forecaster record',
+       source:'Source: cnt-ml/results/metrics_comparison.csv (recorded)'});
+    const qos=d.qos||[]; const bands10=(d.qos_bands||{})['10']||{}; const bands20=(d.qos_bands||{})['20']||{};
+    card('QoS · DiffServ', qos.length?'armed':'no data',
+      qos.length?qos.map(c=>c.name+' '+(c.share==null?'unmetered':Math.round(c.share*100)+'%')).join(' · '):'Policy unavailable',
+      'Meter rates derived by qos_policy.meter_bands() from class share × link capacity.',
+      {stats:qos.filter(c=>c.share!=null).map(c=>[c.name+' (DSCP '+(c.dscp||[]).join('/')+')',(bands10[c.name]||0)+' kbps @10M · '+(bands20[c.name]||0)+' kbps @20M']),
+       compare:Object.keys(bands10).length?{title:'Meter rate by class · 10 Mbps link',items:Object.entries(bands10).map(([k,v])=>[k,v,' kbps'])}:null,
+       href:'/qos',openLabel:'Open the full QoS record',
+       source:'Source: qos_policy.py computed at request time · SDN_QOS=1 in live runs'});
+    const acl=d.acl||{}; const rules=acl.rules||[];
+    card('ACL firewall', rules.length?'armed':'no data',
+      (acl.drops||0)+' packet(s) dropped by ACL rules in live runs',
+      rules.length?rules.map(r=>r.action.toUpperCase()+' '+r.protocol+' → port '+(r.dst_ports&&r.dst_ports[0]===r.dst_ports[1]?r.dst_ports[0]:(r.dst_ports||[]).join('-'))+' from '+r.src).join(' · '):'5-tuple rules from JSON with per-rule hit counts.',
+      {stats:[['Rules loaded & validated',rules.length],['Default policy',acl.default_policy||'—']],
+       href:'/acl',openLabel:'Open the full ACL record',
+       source:'Source: acl_rules.example.json loaded through acl_firewall.py · drops from live control events'});
+    const sl=d.slicing||{}; const slices=sl.slices||[];
+    card('Network slicing', slices.length?'armed':'no data',
+      (sl.drops||0)+' cross-slice drop(s) in live runs',
+      sl.error?('Slice config failed validation: '+sl.error):'Isolation validated at load by slicing.py: host in at most one slice, VLANs unique, shares cannot overcommit.',
+      {stats:slices.map(s=>[s.slice_id+' · VLAN '+s.vlan_id,s.hosts.length+' hosts · '+Math.round(s.share*100)+'% = '+num(s.share*10,1)+' Mbps @10M']),
+       compare:slices.length?{title:'Bandwidth share by slice',items:slices.map(s=>[s.slice_id,Math.round(s.share*100),'%'])}:null,
+       href:'/slicing',openLabel:'Open the full slicing record',
+       source:'Source: slices.example.json loaded through slicing.py · drops from live control events'});
+    const grid=$('#showcase-grid');
+    grid.replaceChildren(...cards.map(c=>{
+      const el=document.createElement(c.href?'a':'div'); el.className='feature-card'+(c.href?' feature-card-link':'');
+      if(c.href) el.href=c.href;
+      const h=document.createElement('h3'); h.textContent=c.title;
+      const chip=document.createElement('span'); chip.className='feature-state '+c.state.replace(' ','-'); chip.textContent=c.state;
+      const head=document.createElement('strong'); head.textContent=c.headline;
+      const det=document.createElement('small'); det.textContent=c.detail;
+      el.append(h,chip,head,det);
+      if(c.stats&&c.stats.length){
+        const box=document.createElement('div'); box.className='feature-stats';
+        c.stats.forEach(([label,value])=>{
+          const row=document.createElement('div'); row.className='feature-stat';
+          const l=document.createElement('span'); l.textContent=label;
+          const b=document.createElement('b'); b.textContent=String(value);
+          row.append(l,b); box.append(row);
+        });
+        el.append(box);
+      }
+      if(c.compare&&c.compare.items&&c.compare.items.length){
+        const box=document.createElement('div'); box.className='feature-compare';
+        const title=document.createElement('div'); title.className='feature-compare-title'; title.textContent=c.compare.title;
+        box.append(title);
+        const max=Math.max(...c.compare.items.map(([,v])=>Number(v)||0),0.0001);
+        c.compare.items.forEach(([label,value,unit])=>{
+          const row=document.createElement('div'); row.className='fc-row';
+          const l=document.createElement('span'); l.className='fc-label'; l.textContent=label;
+          const track=document.createElement('span'); track.className='fc-track';
+          const bar=document.createElement('span'); bar.className='fc-bar'; bar.style.width=Math.max(2,Math.round(100*(Number(value)||0)/max))+'%';
+          track.append(bar);
+          const val=document.createElement('span'); val.className='fc-value'; val.textContent=num(Number(value),Number(value)>=100?0:2)+(unit||'');
+          row.append(l,track,val); box.append(row);
+        });
+        el.append(box);
+      }
+      if(c.source){ const src=document.createElement('small'); src.className='feature-source'; src.textContent=c.source; el.append(src); }
+      if(c.href){ const open=document.createElement('small'); open.className='feature-open'; open.textContent=(c.openLabel||'Open')+' →'; el.append(open); }
+      return el;
+    }));
+    const showing=cards.filter(c=>c.state!=='no data'&&c.state!=='off').length;
+    const liveN=cards.filter(c=>c.state==='live').length;
+    $('#showcase-status').textContent=showing+' of '+cards.length+' features showing data · '+liveN+' live';
+  }catch{ /* Showcase fills in as feature artifacts appear. */ }
 }
 async function refreshResearch(){
   try{

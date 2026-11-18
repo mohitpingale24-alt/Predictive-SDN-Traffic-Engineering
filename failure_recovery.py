@@ -20,7 +20,10 @@ class FailureRecoveryTracker:
                       reroute_at=None, recovered_at=None,
                       loss_samples=[], util_samples=[])
         self._down[str(link_id)] = record
-        self._events.append(dict(event="link_down", **record))
+        # Keep a reference to the live record, not a snapshot copy:
+        # note_reroute()/note_sample()/link_up() mutate the record in
+        # place, and a completed report must see those mutations.
+        self._events.append(dict(event="link_down", record=record))
         return record
 
     def link_up(self, link_id, timestamp):
@@ -79,5 +82,10 @@ class FailureRecoveryTracker:
         )
 
     def completed_reports(self):
-        return [self.report(r) for r in self._events if r.get("event") == "link_down"
-                and r not in self._down.values()]
+        # An outage is complete when its record is no longer the live one
+        # for that link. Identity (not equality, not link_id) so a second
+        # outage on the same link does not hide or resurrect the first.
+        live = list(self._down.values())
+        return [self.report(event["record"]) for event in self._events
+                if event.get("event") == "link_down"
+                and not any(event["record"] is record for record in live)]

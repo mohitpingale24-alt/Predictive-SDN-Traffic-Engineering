@@ -54,8 +54,11 @@ class SurgeDetector:
         self._last[source] = rate
         if verdict is None:
             return None
+        # rate_mbps is the baseline mean the source is limited back to;
+        # observed_rate_mbps is the spike that triggered the mitigation.
         mitigation = dict(action="rate_limit", source=source,
                           rate_mbps=verdict["baseline_mean"],
+                          observed_rate_mbps=round(rate, 3),
                           started_at=float(timestamp), **verdict)
         self._active[source] = mitigation
         return mitigation

@@ -1,0 +1,93 @@
+*** Removing excess controllers/ofprotocols/ofdatapaths/pings/noxes
+killall controller ofprotocol ofdatapath ping nox_corelt-nox_core ovs-openflowd ovs-controllerovs-testcontroller udpbwtest mnexec ivs ryu-manager 2> /dev/null
+killall -9 controller ofprotocol ofdatapath ping nox_corelt-nox_core ovs-openflowd ovs-controllerovs-testcontroller udpbwtest mnexec ivs ryu-manager 2> /dev/null
+pkill -9 -f "sudo mnexec"
+*** Removing junk from /tmp
+rm -f /tmp/vconn* /tmp/vlogs* /tmp/*.out /tmp/*.log
+*** Removing old X11 tunnels
+*** Removing excess kernel datapaths
+ps ax | egrep -o 'dp[0-9]+' | sed 's/dp/nl:/'
+***  Removing OVS datapaths
+ovs-vsctl --timeout=1 list-br
+ovs-vsctl --timeout=1 list-br
+*** Removing all links of the pattern foo-ethX
+ip link show | egrep -o '([-_.[:alnum:]]+-eth[[:digit:]]+)'
+ip link show
+*** Killing stale mininet node processes
+pkill -9 -f mininet:
+*** Shutting down stale tunnels
+pkill -9 -f Tunnel=Ethernet
+pkill -9 -f .ssh/mn
+rm -f ~/.ssh/mn/*
+*** Cleanup complete.
+campaign-03: 0/32 already complete, 32 to run (controller sha 3e3ab24d57f6...)
+[static/run-01] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/output/campaign-03/static/run-01
+[static/run-01] complete in 107.9s
+[static/run-02] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/output/campaign-03/static/run-02
+[static/run-02] complete in 107.8s
+[static/run-03] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/output/campaign-03/static/run-03
+[static/run-03] complete in 107.6s
+[static/run-04] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/output/campaign-03/static/run-04
+[static/run-04] complete in 107.6s
+[static/run-05] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/output/campaign-03/static/run-05
+[static/run-05] complete in 107.8s
+[static/run-06] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/output/campaign-03/static/run-06
+[static/run-06] complete in 108.0s
+[static/run-07] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/output/campaign-03/static/run-07
+[static/run-07] complete in 107.7s
+[static/run-08] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed static experiment -> /mnt/output/campaign-03/static/run-08
+[static/run-08] complete in 107.6s
+[reactive/run-01] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/output/campaign-03/reactive/run-01
+[reactive/run-01] complete in 107.7s
+[reactive/run-02] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/output/campaign-03/reactive/run-02
+[reactive/run-02] complete in 107.6s
+[reactive/run-03] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/output/campaign-03/reactive/run-03
+[reactive/run-03] complete in 108.0s
+[reactive/run-04] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)

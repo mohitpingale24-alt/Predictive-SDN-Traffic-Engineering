@@ -175,13 +175,18 @@ def worker(identifier, lock_fd):
                      'route_transition.py', 'openflow_routes.py', 'confidence_policy.py',
                      'topology_graph.py', 'failure_recovery.py', 'drift_detection.py',
                      'explainability.py', 'anomaly_mitigation.py', 'topologies_v2.py',
-                     'conformal_runtime.py', 'drift_adaptation.py', 'link_map.py'):
+                     'conformal_runtime.py', 'drift_adaptation.py', 'link_map.py',
+                     'qos_policy.py', 'acl_firewall.py', 'link_latency.py',
+                     'slicing.py'):
+            shutil.copy2(ROOT / name, source / name)
+        for name in ('acl_rules.example.json', 'slices.example.json'):
             shutil.copy2(ROOT / name, source / name)
         for name in ('experiments', 'cnt-ml/src'):
             shutil.copytree(ROOT / name, source / name, ignore=shutil.ignore_patterns('__pycache__'))
         (source / 'cnt-ml/models').mkdir()
         for name in ('feature_list.json', 'xgb_link_predictor.joblib', 'gbdt_portable.json',
-                     'gbdt_parity_fixture.json', 'gbdt_confidence.json'):
+                     'gbdt_parity_fixture.json', 'gbdt_confidence.json',
+                     'conformal_calibration.json'):
             shutil.copy2(ROOT / 'cnt-ml/models' / name, source / 'cnt-ml/models' / name)
         prepared = source / 'cnt-ml/data/real/calibration-02/prepared'
         prepared.mkdir(parents=True)

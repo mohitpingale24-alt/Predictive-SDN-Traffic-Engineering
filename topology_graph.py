@@ -152,8 +152,8 @@ def ecmp_select(flow_key, paths):
     """Deterministic ECMP choice: stable hash of the flow key over the paths.
 
     The same flow always lands on the same path (no per-packet spraying, so no
-    reordering); different flows spread across the equal-cost set. Weights are
-    proportional to each path's bottleneck capacity, derived from the graph.
+    reordering); different flows spread uniformly across the equal-cost set.
+    For capacity-weighted spreading use ecmp_weighted_select instead.
     """
     if not paths:
         return None

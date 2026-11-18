@@ -1,0 +1,1 @@
+{"default_policy":"allow","rules":[{"action":"deny","dst":"any","dst_port":22,"priority":100,"protocol":"tcp","src":"10.0.0.0/24"},{"action":"deny","dst":"any","dst_port":"8000-9000","priority":90,"protocol":"udp","src":"any"}]}

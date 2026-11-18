@@ -1,6 +1,7 @@
 """Run the existing experiment in an isolated VM and publish durable progress."""
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -26,8 +27,29 @@ def main():
     if args.scenario != 'legacy':
         command += ['--scenario', args.scenario, '--topology', args.topology,
                     '--repetition', str(args.repetition)]
+    # Extension wiring: the runners copy os.environ into the controller
+    # environment, so feature switches are set here, once. QoS meters only
+    # bind DSCP-marked traffic and the ACL/slicing rules never match the
+    # experiment flows (verified against experiments/scenarios.py ports
+    # and host pairs), so enabling them does not change workload
+    # semantics; conformal gating is enabled only for the systems whose
+    # design already includes a confidence gate.
+    source_root = Path(__file__).resolve().parents[1]
+    environment = dict(os.environ)
+    environment.setdefault('SDN_QOS', '1')
+    environment.setdefault('SDN_ACL_PATH', str(source_root / 'acl_rules.example.json'))
+    environment.setdefault('SDN_SLICES_PATH', str(source_root / 'slices.example.json'))
+    environment['SDN_RECALIBRATION_PATH'] = str(args.output / 'capture' / 'recalibration.json')
+    try:
+        from scenarios import SYSTEM_CONFIG
+        confidence_gated = bool(SYSTEM_CONFIG[args.system]['confidence_gate'])
+    except Exception:
+        confidence_gated = args.system in ('predictive-safe', 'predictive-confidence')
+    if confidence_gated:
+        environment.setdefault('SDN_CONFORMAL', '1')
     with (args.output / 'experiment.log').open('w') as log:
-        result = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT)
+        result = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT,
+                                env=environment)
     status('complete' if result.returncode == 0 else 'failed',
            'Capture ready' if result.returncode == 0 else 'Experiment failed. Inspect experiment.log and capture/controller.log.')
 
