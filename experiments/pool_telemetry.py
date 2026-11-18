@@ -9,7 +9,10 @@ one series instead of colliding on the same wall-clock seconds.
 Usage: python3 experiments/pool_telemetry.py CAPTURE_DIR [CAPTURE_DIR ...]
        [--out cnt-ml/data/processed/telemetry_pooled.csv]
 Output rows keep the telemetry schema; train_gnn.py consumes the file
-directly.
+directly. The active_flows column is carried through as recorded —
+in all-links captures it is 0, meaning not measured (the field counts
+flow-table entries on s1 in the legacy telemetry, never application
+flows).
 """
 
 import argparse

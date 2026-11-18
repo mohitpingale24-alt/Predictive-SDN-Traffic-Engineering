@@ -103,7 +103,16 @@ the predictive-ml captures, pooled across 8 runs, n = 1378 aligned
 pairs): mean loss diff -24.4 (favours ML), DM -1.41, **p = 0.157 —
 not significant**. On absolute loss the picture reverses (run-01 MAE:
 persistence 10.83 vs ML 14.50): the ML forecaster helps at transitions
-and is slightly worse in calm periods. Conformal calibration was also
+and is slightly worse in calm periods. One caveat applies to this and
+to every DM figure in the project: the pooled errors come from live
+controller runs, and the routing decisions taken during those runs
+changed the traffic that was subsequently measured and predicted. The
+comparison is matched-workload evidence — both forecasters scored on
+identical realized targets under the same intervention regime — not
+a pure held-out forecast comparison on intervention-free data; a
+forecaster whose predictions trigger reroutes partly authors its own
+future targets, and no pairing of the recorded rows removes that.
+Conformal calibration was also
 re-measured honestly: the previously quoted 0.907 coverage was
 computed on the calibration rows themselves and is retracted. With a
 chronological split (103 calibration rows, radius 26.8 points), the

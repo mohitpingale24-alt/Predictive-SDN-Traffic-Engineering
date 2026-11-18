@@ -1,0 +1,519 @@
+\documentclass[conference]{IEEEtran}
+
+% ================= PACKAGES =================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage[hypertexnames=false]{hyperref}
+\usepackage{booktabs}
+\usepackage{balance}
+\hypersetup{
+    colorlinks=true,
+    urlcolor=blue,
+    citecolor=blue,
+    linkcolor=black
+}
+
+% ================= TITLE =================
+\title{Uncertainty-Aware Predictive Traffic Engineering in
+Software-Defined Networks: A Conformal-Gated Controller
+Evaluated over 64 Controlled Runs}
+
+% TODO: confirm co-authors, order, and affiliations before submission.
+\author{\IEEEauthorblockN{Mohit Pingale}
+\IEEEauthorblockA{Department of Computer Engineering\\
+Vishwakarma Institute of Technology, Pune, India}}
+
+\begin{document}
+\maketitle
+
+% ================= ABSTRACT =================
+\begin{abstract}
+Predictive controllers for software-defined networks (SDN) are usually
+evaluated on point-forecast accuracy and a handful of runs. We argue
+that neither is sufficient: a forecast that drives rerouting should
+carry a measured uncertainty statement, and its value should be judged
+at the level of network outcomes under repeated, configuration-matched
+trials. We present a predictive traffic-engineering controller for a
+Ryu/OpenFlow network that couples a gradient-boosting utilization
+forecaster with split-conformal prediction intervals, an explicit
+confidence gate, per-decision explanations, and drift detection, and
+we evaluate four controllers (static, reactive, predictive-persistence,
+predictive-ML) over 64 controlled Mininet runs (16 repetitions per
+system, two campaigns, one frozen source tree, automated configuration
+validation). The predictive-ML controller eliminated congestion
+entirely (0.000\,s mean congestion duration and a congestion-avoidance
+rate of 1.000, versus 3.000\,s and 0.250 for both reactive and
+persistence control, and 38.500\,s for static routing). On 2{,}736
+forecast samples paired with the identical recorded actuals, the
+learned forecaster is certified better than persistence on squared
+loss (Diebold--Mariano statistic 2.945, $p = 0.0032$; per-run sign
+test 16/16, $p \approx 3.1 \times 10^{-5}$), while persistence remains
+better on mean absolute error (10.90 vs.\ 14.78 points) and the
+predictive controller pays a small, now statistically resolved
+average-latency cost of $\approx$0.58\,ms. We report the negative
+results with equal prominence: the conformal interval's headline
+coverage is an in-sample figure whose split evaluation is pending,
+the confidence gate never passed in live operation (reroutes were
+executed by a measured fallback path), and a graph neural network
+forecaster does not beat persistence on real telemetry. The
+contribution is an uncertainty-aware control architecture and an
+evaluation discipline---matched configurations, same-target forecast
+tests, and intervention-aware interpretation---that makes both the
+positive and the negative claims auditable.
+\end{abstract}
+
+\begin{IEEEkeywords}
+software-defined networking, traffic engineering, conformal
+prediction, gradient boosting, Diebold--Mariano test, OpenFlow,
+Mininet
+\end{IEEEkeywords}
+
+% ================= INTRODUCTION =================
+\section{Introduction}
+Traffic engineering (TE) in software-defined networks increasingly
+relies on short-horizon forecasts: if a controller can see congestion
+five seconds before it forms, it can move traffic before queues build
+rather than after loss appears. The published pattern, however, is
+fragile in two ways. First, forecast quality is typically reported as
+a single accuracy number on a single run, with no significance test
+and no separation between the forecaster's skill and the controller's
+effect on the very traffic being forecast. Second, point forecasts
+give the control loop no way to distinguish a confident prediction
+from a guess, so systems reroute on noise or fail to reroute on
+signal.
+
+This paper takes the position that predictive TE should be built and
+judged as an uncertainty-aware system:
+
+\begin{itemize}
+\item \textbf{Intervals, not points.} The forecaster ships with
+split-conformal intervals (with conformalized quantile regression and
+adaptive conformal inference variants), so every routing decision can
+consult a coverage-calibrated range rather than a bare number.
+\item \textbf{An explicit gate, and an honest fallback.} A confidence
+gate decides whether a forecast is strong enough to act on; when it
+is not, a measured fallback path---not silence---handles the decision,
+and every decision is logged with its reason and its top contributing
+features.
+\item \textbf{Evaluation that can falsify the claims.} Four
+controllers are compared over 64 configuration-matched runs; forecast
+comparisons pair both forecasters against identical recorded actuals
+and are reported with Diebold--Mariano (DM) tests; interval coverage
+is labelled by whether it was measured in-sample or held out.
+\end{itemize}
+
+The results support a narrower and stronger claim than ``ML beats
+baselines.'' Predictive-ML control eliminated congestion in all 16 of
+its runs, and its forecaster is significantly better than persistence
+at avoiding large errors---the errors that precede congestion---while
+being worse on average absolute error and slightly worse on mean
+latency. Section~\ref{sec:results} states each claim with its test;
+Section~\ref{sec:threats} states what the evaluation cannot support.
+
+% ================= RELATED WORK =================
+\section{Related Work}
+Centralized TE with global visibility originates with systems such as
+B4~\cite{jain2013b4} and SWAN~\cite{hong2013swan} over the OpenFlow
+control abstraction~\cite{mckeown2008openflow}; our controller is a
+single-switch-pair prototype in that lineage, not a WAN system.
+Learning-based TE typically optimizes routing from predicted traffic
+matrices; we instead forecast per-link utilization at a 5-second
+horizon and focus on the evaluation of that forecast. Conformal
+prediction~\cite{lei2018distributionfree} provides
+distribution-free prediction intervals under exchangeability;
+conformalized quantile regression~\cite{romano2019conformalized} and
+adaptive conformal inference~\cite{gibbs2021adaptive} address
+heteroscedasticity and distribution shift, both of which appear in
+our data. Forecast comparison follows Diebold and
+Mariano~\cite{diebold1995comparing} with Newey--West HAC variance and
+the Harvey--Leybourne--Newbold small-sample correction. Graph neural
+forecasters~\cite{kipf2017gcn} are a natural extension to joint
+multi-link prediction; we evaluate one and report its negative
+result. Experiments run in Mininet~\cite{lantz2010mininet} under the
+Ryu controller framework.
+
+% ================= SYSTEM DESIGN =================
+\section{System Design}
+
+% FIGURE 1 SOURCE: architecture of path_switch_controller.py with
+% conformal_runtime.py, confidence_policy.py, explainability.py;
+% redraw from frontend dashboard topology view (diamond4).
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.92\columnwidth}{\centering\vspace{1.2em}
+[Figure 1 placeholder --- system architecture: telemetry loop,
+forecaster, conformal interval service, confidence gate and measured
+fallback, reroute actuator, explanation and drift logs]\vspace{1.2em}}}
+\caption{Controller architecture. Every reroute decision is logged
+with its reason, the interval that accompanied the forecast, and the
+features that contributed most.}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Network and workload}
+The evaluation topology (Fig.~\ref{fig:arch}) is a four-switch diamond:
+hosts $h_1, h_2$ attach to $s_1, s_4$; path~A ($s_1$--$s_2$--$s_4$)
+has 10\,Mbps links with 2\,ms delay per link, path~B
+($s_1$--$s_3$--$s_4$) 20\,Mbps with 4\,ms. A single UDP iperf3 flow
+follows a fixed five-phase workload (warmup, ramp, near-threshold,
+congestion, recovery; 90\,s of traffic after a 5\,s settle). The
+congestion threshold is 85\% utilization and the recovery threshold
+70\%, identical for every controller and run.
+
+\subsection{Controllers under comparison}
+Four systems share the same telemetry, topology, and workload and
+differ only in control law: \emph{static} (never reroutes),
+\emph{reactive} (reroutes on measured threshold crossings),
+\emph{predictive-persistence} (predictive control whose forecaster is
+$\hat{u}_{t+5} = u_t$), and \emph{predictive-ML} (predictive control
+with the learned forecaster). Predictive control requires three
+consecutive signals, a minimum projected improvement of 5 points, and
+observes a 15\,s cooldown; transitions are make-before-break and are
+timed and logged.
+
+\subsection{Forecasters}
+The learned forecaster is a scikit-learn gradient boosting regressor
+(100 depth-2 estimators, learning rate 0.03, high-load samples
+weighted $\times$20) over lagged utilization, rolling means, and
+throughput features, trained exclusively on a separate calibration
+campaign and frozen before evaluation; a portable tree representation
+with checksum-verified host/guest parity is what the controller
+executes. On the calibration campaign's held-out split it records
+RMSE 16.11 and $R^2 = 0.700$, against linear regression (19.57,
+0.558) and persistence (RMSE 22.32, MAE 9.92, $R^2 = 0.425$)
+(source: \texttt{cnt-ml/results/metrics\_comparison.csv}).
+
+\subsection{Uncertainty: conformal intervals and the gate}
+Split-conformal calibration on held-out calibration-campaign rows
+produces a residual radius; conformalized quantile regression wraps
+the quantile forecaster (P50/P90/P99), and adaptive conformal
+inference (ACI) adjusts the miscoverage level online. At decision
+time the confidence gate admits a forecast-driven reroute only if the
+interval's lower bound clears the congestion threshold. When the gate
+does not admit the forecast---or no forecast exists---the controller
+does not stall: a \emph{measured fallback} reroutes on directly
+measured recovery/congestion evidence, and the decision log records
+which path produced each reroute. Section~\ref{sec:gate} reports how
+often each path fired in live operation; the gate's live record is
+part of our results, not an assumption.
+
+\subsection{Explanations and drift detection}
+Every evaluated decision writes an explanation row (active and
+candidate path, reason, gate outcome, projected improvement, top
+features by split-count $\times$ deviation importance). Two drift
+detectors---Page--Hinkley and an ADWIN-style window comparison---run
+on the forecast-error stream and log events; an optional online
+recalibration strategy adapts the conformal radius when drift is
+declared. These components are evaluated as instruments: we report
+what they recorded, including when they recorded nothing actionable.
+
+\subsection{A graph forecaster, evaluated and rejected}
+A two-layer graph convolutional network over the link line-graph was
+trained to forecast all links jointly and compared against
+persistence and a per-link ridge on identical features. Its result is
+reported in Section~\ref{sec:gnn}; it is not part of the deployed
+controller.
+
+% ================= PROTOCOL =================
+\section{Evaluation Protocol}
+\label{sec:protocol}
+\textbf{Matched configurations, frozen source.} All 64 runs (two
+campaigns of 32; 16 repetitions per system in the pooled analysis) ran
+one frozen source tree whose files are SHA-256 recorded in every
+run's metadata. The pooled analysis re-validates, for every run, that
+capacities, topology, workload, thresholds, environment versions, and
+source hashes are identical, and refuses to aggregate otherwise.
+Runs failing the automated quality gate (controller errors, missing
+receiver data, prediction coverage below 95\% of eligible rows) are
+excluded and preserved; campaign-01 was excluded in full after a
+model-deserialization failure and plays no role in any number below.
+
+\textbf{Same-target forecast tests.} A forecast comparison is only
+meaningful against a fixed future. We therefore pair each forecast
+issued inside the predictive-ML captures with the telemetry value
+recorded for the same link exactly 5\,s later, and score
+\emph{both} forecasters against that identical actual. A
+cross-controller pairing---scoring one controller's forecasts against
+another controller's realized traffic---is invalid, because each
+controller induces a different future; an earlier pooled test of that
+form was retracted for exactly this reason and is not used. DM tests
+use squared loss, Newey--West HAC variance (lag 5), and the HLN
+correction; a per-run sign test accompanies them.
+
+\textbf{Interval honesty.} Coverage figures are labelled in-sample
+(measured on calibration rows) or held-out (chronological split or an
+untouched capture). No headline claim in this paper rests on an
+in-sample coverage number; see Section~\ref{sec:conformal}.
+
+\textbf{Intervention censoring.} When a forecast triggers a reroute,
+the congestion it predicted may never occur. Counting such forecasts
+as false alarms would penalize the controller for succeeding; we
+therefore judge forecasts by error against realized values
+(Section~\ref{sec:forecast}) and judge the \emph{system} by realized
+congestion (Section~\ref{sec:congestion}), and say so explicitly
+where the two readings diverge.
+
+% ================= RESULTS =================
+\section{Results}
+\label{sec:results}
+
+\subsection{Congestion: the system-level claim}
+\label{sec:congestion}
+Table~\ref{tab:systems} reports the pooled n=16 analysis
+(source: \texttt{combined-16/final-analysis/network\_statistics.csv}).
+Predictive-ML is the only controller with zero congestion: mean
+congestion duration 0.000\,s (95\% CI [0.000, 0.000]) and avoidance
+rate 1.000 in all 16 runs, against 3.000\,s for both reactive and
+predictive-persistence control, 38.500\,s for static routing, and
+avoidance 0.250 [0.112, 0.388] for both non-ML rerouting controllers.
+Static routing additionally loses 11.44\% of packets; all rerouting
+controllers are at or below 0.012\%.
+
+\begin{table*}[t]
+\centering
+\caption{Pooled system results, 16 repetitions per system (64 runs).
+Mean [95\% CI]. Source:
+\texttt{final-evaluation-artifacts/combined-16/final-analysis/network\_statistics.csv}.}
+\label{tab:systems}
+\begin{tabular}{lrrrr}
+\toprule
+Metric & Static & Reactive & Pred.-Persistence & Pred.-ML \\
+\midrule
+Congestion duration (s)      & 38.500 [38.225, 38.775] & 3.000 [3.000, 3.000] & 3.000 [3.000, 3.000] & \textbf{0.000 [0.000, 0.000]} \\
+Congestion events            & 1.500 [1.225, 1.775] & 1.000 & 1.000 & \textbf{0.000} \\
+Avoidance rate               & --- & 0.250 [0.112, 0.388] & 0.250 [0.112, 0.388] & \textbf{1.000 [1.000, 1.000]} \\
+Avg latency (ms)             & 21.031 [19.489, 22.572] & \textbf{11.846 [11.767, 11.925]} & 11.973 [11.766, 12.180] & 12.427 [12.215, 12.638] \\
+P95 latency (ms)             & 125.969 [125.626, 126.311] & 16.676 [16.601, 16.752] & 16.734 [16.633, 16.835] & 16.773 [16.645, 16.900] \\
+Avg jitter (ms)              & 0.118 [0.111, 0.126] & 0.061 [0.039, 0.083] & 0.059 [0.049, 0.069] & 0.179 [$-$0.046, 0.405] \\
+Throughput (Mbps)            & 6.970 & 7.883 & 7.882 & 7.881 \\
+Packet loss (\%)             & 11.442 & 0.000 & 0.012 & 0.012 \\
+Mean inference (ms)          & --- & --- & 0.011 & 1.328 [1.208, 1.448] \\
+Mean controller CPU (\%)     & 0.611 & 0.659 & 0.733 & 0.903 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+% FIGURE 2 SOURCE: final-evaluation-artifacts/combined-16/final-analysis/network_statistics.csv
+% (Congestion_Duration_seconds by system, with campaign-02-only overlay).
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.92\columnwidth}{\centering\vspace{1.2em}
+[Figure 2 placeholder --- congestion duration by controller,
+n=16, with n=8 campaign-02 overlay]\vspace{1.2em}}}
+\caption{Congestion duration per controller. Predictive-ML is zero
+in every repetition of both campaigns.}
+\label{fig:congestion}
+\end{figure}
+
+\subsection{The latency cost, stated plainly}
+At n=8 the latency comparison was unresolved (overlapping intervals).
+At n=16 it resolves, against the predictive controller: mean latency
+12.427\,ms [12.215, 12.638] versus reactive 11.846\,ms
+[11.767, 11.925]---a real cost of $\approx$0.58\,ms ($\approx$5\%).
+P95 latency intervals still overlap (16.773 [16.645, 16.900] vs.\
+16.676 [16.601, 16.752]), and jitter intervals overlap widely; the
+predictive controller's jitter mean (0.179) is driven by high
+variance across runs rather than a consistent per-run penalty. We
+report the mean-latency cost as the measured price of predictive
+rerouting in this workload; throughput is indistinguishable across
+rerouting controllers (7.881--7.883\,Mbps).
+
+\subsection{Forecast quality: better where it matters, worse on average}
+\label{sec:forecast}
+Table~\ref{tab:forecast} scores both forecasters on the 2{,}736
+same-target pairs of Section~\ref{sec:protocol}. The learned
+forecaster is significantly better on squared loss (DM $= 2.945$,
+$p = 0.0032$; mean squared-loss differential 39.01 points in its
+favour) and wins the per-run squared-loss comparison in all 16 runs
+(sign test $p \approx 3.1 \times 10^{-5}$). It is simultaneously
+\emph{worse} on MAE in every run (14.78 vs.\ 10.90 pooled). Both
+statements are true, and the mechanism is visible in the error
+structure: the learned forecaster carries a $+9.6$-point mean bias
+whenever current utilization is at least 50\%---it anticipates ramps
+that plateau---so it bleeds absolute error in calm periods (calm-half
+MAE 13.1 vs.\ 7.4) while avoiding the large misses at transitions
+that dominate squared loss and precede congestion.
+
+\begin{table}[t]
+\centering
+\caption{Same-target forecast comparison, 2{,}736 pairs pooled over
+16 predictive-ML runs. Source:
+\texttt{combined-16/final-analysis/combined\_summary.json}
+(generator: \texttt{experiments/merge\_campaigns.py}).}
+\label{tab:forecast}
+\begin{tabular}{lrr}
+\toprule
+ & Persistence & Gradient Boosting \\
+\midrule
+MAE (points)  & \textbf{10.90} & 14.78 \\
+RMSE (points) & 22.99 & \textbf{22.12} \\
+\midrule
+\multicolumn{3}{l}{DM (squared loss, HAC + HLN): 2.945, $p = 0.0032$} \\
+\multicolumn{3}{l}{Per-run sign test: GB wins 16/16, $p \approx 3.1 \times 10^{-5}$} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+We attempted to close the MAE gap without touching the frozen model,
+selecting every candidate leave-one-run-out (fit on 7 runs, scored on
+the held-out run, campaign-02's 8 runs): a volatility gate, a
+predicted-move gate, and convex blends all collapse to pure
+persistence in every fold; linear recalibration attains the best RMSE
+of any variant (21.25) but worsens MAE (15.67). An oracle gate
+(MAE 8.43) shows headroom exists, but no signal available at
+prediction time identifies when the learned forecaster is right. We
+therefore make no hybrid claim; the MAE gap is a training-distribution
+artifact whose honest remedy---retraining on calibration data only,
+never on the evaluation campaigns---is future work.
+
+% FIGURE 3 SOURCE: paired forecast errors from
+% final-evaluation-artifacts/campaign-02 + campaign-03 predictive-ml
+% predictions.csv/telemetry.csv (audit scripts: WEAK_METRIC_AUDIT.md).
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.92\columnwidth}{\centering\vspace{1.2em}
+[Figure 3 placeholder --- forecast error by regime: calm vs.\
+volatile halves, MAE and RMSE for both forecasters]\vspace{1.2em}}}
+\caption{The learned forecaster's MAE deficit is concentrated in
+calm periods; its squared-loss advantage is concentrated at
+transitions.}
+\label{fig:regime}
+\end{figure}
+
+\subsection{Conformal intervals: an in-sample headline, a pending split}
+\label{sec:conformal}
+The shipped calibration artifact
+(\texttt{cnt-ml/models/conformal\_calibration.json}; calibrated on
+172 rows of one campaign-02 capture) carries radius 38.51 points and
+an empirical coverage of 0.907 at nominal 0.90. \textbf{That coverage
+figure is in-sample}---it is measured on the calibration rows
+themselves---and we do not claim it as held-out evidence. A
+chronological split evaluation of the interval (calibrate on an early
+segment, measure on a later, untouched segment and on an untouched
+capture) is the required correction and is in progress; its result
+belongs here: \textcolor{red}{\textbf{[SPLIT COVERAGE: TBD]}}.
+Until it lands, the interval's status in this paper is a mechanism
+with a measured calibration, not a certified guarantee---and the
+gate behaviour reported next is exactly what that status predicts.
+
+\subsection{The confidence gate never passed live; the fallback operated}
+\label{sec:gate}
+Across all recorded live captures, the confidence gate admitted zero
+forecast-driven reroutes (690 recorded live intervals, 0 passed). In
+the fully instrumented predictive-safe live run, all 140 intervals
+were held by the gate; the run's two reroutes were executed by the
+measured fallback, and its 80 logged decisions decompose as 40
+\texttt{confidence\_gate\_closed}, 30 \texttt{measured\_recovery},
+and 10 \texttt{missing\_prediction}, with utilization the top
+contributing feature. We document this rather than tune it away:
+with intervals as wide as the current calibration produces, a gate
+that requires the lower bound to clear an 85\% threshold is close to
+arithmetically dormant, and shrinking intervals or lowering the
+threshold to manufacture passes would destroy the meaning of both.
+The system remained safe and effective because the fallback is a
+first-class path, and the explanation log makes the substitution
+visible decision by decision. In the same live run, both drift
+detectors (Page--Hinkley and ADWIN-style) fired on the error stream,
+and 66 anomalies (62 elephant-flow, 4 surge) were recorded; live
+transitions completed in 0.534\,s on average with no failures.
+
+\subsection{The GNN forecaster does not beat persistence}
+\label{sec:gnn}
+On real campaign telemetry the graph forecaster records MAE 18.39
+against persistence 14.87 (RMSE 27.37 vs.\ 26.11; DM $p = 0.491$, not
+significant), after fixes for exact-timestamp windowing and residual
+self-projections. The structural cause is visible in the data: the
+legacy captures record only the two $s_1$ uplinks, so the line-graph
+has two nodes and the joint model has almost no spatial structure to
+exploit. The controller now records every core link
+(\texttt{telemetry\_all\_links.csv}); the pooled re-evaluation on
+that data is the correct test and has not yet been run. The negative
+result stands as reported.
+
+% ================= THREATS =================
+\section{Threats to Validity}
+\label{sec:threats}
+\textbf{Single topology and workload family.} All controlled results
+come from one diamond topology and one five-phase workload; the
+access6 topology is exercised only in non-controlled scenarios.
+Generalization is a claim we do not make.
+\textbf{Emulation.} Mininet timings are not hardware timings;
+absolute latencies would differ on physical switches, though the
+matched design protects the comparisons.
+\textbf{Exchangeability.} Conformal coverage is marginal and assumes
+exchangeability within the calibration window; the workload's phase
+structure violates it in principle, which is why the split evaluation
+of Section~\ref{sec:conformal}---not the in-sample figure---is the
+number that matters, and why ACI is included as mitigation rather
+than proof.
+\textbf{Intervention censoring.} Forecast errors are scored against
+futures the controller itself altered; Section~\ref{sec:protocol}
+describes the pairing discipline this forced, and the retracted
+cross-controller test is the cautionary example.
+\textbf{One-second sampling} may miss sub-second congestion, and
+controller event timestamps do not certify hardware flow
+acknowledgement.
+
+% ================= CONCLUSION =================
+\section{Conclusion}
+A predictive SDN controller earns its complexity only if its
+advantage survives repetition, matched configuration, and tests that
+could have gone the other way. Over 64 controlled runs, ours does on
+the outcome it exists for---congestion is eliminated in every
+repetition---and its forecaster is certified better than persistence
+precisely on the large errors that precede congestion, while costing
+0.58\,ms of mean latency and losing on average absolute error. Its
+uncertainty machinery is reported at the same standard: an in-sample
+coverage headline awaiting its split evaluation, and a confidence
+gate that never passed live, with the measured fallback---fully
+logged---doing the work instead. We regard that combination, not any
+single metric, as the publishable unit: an uncertainty-aware
+controller whose strengths and failure modes are both measured.
+
+\section*{Artifact Availability}
+All code, run captures, campaign manifests, and analysis scripts are
+public at
+\url{https://github.com/mohitpingale24-alt/Predictive-SDN-Traffic-Engineering}.
+The pooled statistics in Table~\ref{tab:systems} regenerate from the
+preserved captures with \texttt{experiments/merge\_campaigns.py};
+every run's metadata records the SHA-256 of the source files that
+produced it.
+
+% ================= REFERENCES =================
+\begin{thebibliography}{00}
+\bibitem{mckeown2008openflow} N.~McKeown \emph{et al.}, ``OpenFlow:
+Enabling innovation in campus networks,'' \emph{ACM SIGCOMM CCR},
+vol.~38, no.~2, pp.~69--74, 2008.
+\bibitem{jain2013b4} S.~Jain \emph{et al.}, ``B4: Experience with a
+globally-deployed software defined WAN,'' in \emph{Proc. ACM
+SIGCOMM}, 2013, pp.~3--14.
+\bibitem{hong2013swan} C.-Y.~Hong \emph{et al.}, ``Achieving high
+utilization with software-driven WAN,'' in \emph{Proc. ACM SIGCOMM},
+2013, pp.~15--26.
+\bibitem{lantz2010mininet} B.~Lantz, B.~Heller, and N.~McKeown, ``A
+network in a laptop: Rapid prototyping for software-defined
+networks,'' in \emph{Proc. ACM HotNets}, 2010.
+\bibitem{lei2018distributionfree} J.~Lei, M.~G'Sell, A.~Rinaldo,
+R.~J.~Tibshirani, and L.~Wasserman, ``Distribution-free predictive
+inference for regression,'' \emph{J. Amer. Statist. Assoc.},
+vol.~113, no.~523, pp.~1094--1111, 2018.
+\bibitem{romano2019conformalized} Y.~Romano, E.~Patterson, and
+E.~J.~Cand\`es, ``Conformalized quantile regression,'' in
+\emph{Proc. NeurIPS}, 2019.
+\bibitem{gibbs2021adaptive} I.~Gibbs and E.~J.~Cand\`es, ``Adaptive
+conformal inference under distribution shift,'' in \emph{Proc.
+NeurIPS}, 2021.
+\bibitem{diebold1995comparing} F.~X.~Diebold and R.~S.~Mariano,
+``Comparing predictive accuracy,'' \emph{J. Bus. Econ. Statist.},
+vol.~13, no.~3, pp.~253--258, 1995.
+\bibitem{kipf2017gcn} T.~N.~Kipf and M.~Welling, ``Semi-supervised
+classification with graph convolutional networks,'' in \emph{Proc.
+ICLR}, 2017.
+\end{thebibliography}
+
+\balance
+\end{document}

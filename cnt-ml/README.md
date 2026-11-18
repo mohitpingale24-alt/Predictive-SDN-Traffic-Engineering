@@ -126,6 +126,9 @@ if predicted_utilization >= 85.0:
 When Mininet + Ryu telemetry is ready:
 1. Save the raw CSV to `data/raw/telemetry_raw.csv` with schema:
    `timestamp,link_id,utilization,throughput,delay,packet_loss,active_flows`
+   (`active_flows` counts installed OpenFlow flow-table entries on the
+   reporting port — a rule count, not application flows; in
+   `telemetry_all_links.csv` it is recorded as 0 = not measured.)
 2. Run `python src/validate_schema.py`
 3. Execute `bash run_all_phases.sh --yes` to retrain and evaluate the tabular models.
 4. Run `python src/train_gru.py` separately to retrain and evaluate the optional GRU comparison.

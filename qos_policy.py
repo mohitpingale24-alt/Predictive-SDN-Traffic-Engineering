@@ -1,4 +1,4 @@
-"""DiffServ QoS policy: DSCP classes, meter bands and queues.
+"""DiffServ QoS policy: DSCP classes and meter bands.
 
 Pure Python. The policy is data: traffic classes with their DSCP values,
 their share of link capacity, and their queue/meter ids. Meter rates are
@@ -6,6 +6,11 @@ their share of link capacity, and their queue/meter ids. Meter rates are
 never stored as absolute numbers, so the same policy is correct on a
 10 Mbps teaching link and a 10 Gbps one. Replace the whole policy by
 pointing SDN_QOS_POLICY_PATH at a JSON file of the same shape.
+
+Enforcement is OpenFlow meters (rate caps) only. No SetQueue action is
+programmed anywhere in the controller, so there is no priority
+queueing: the queue ids in the class table are policy metadata carried
+with the classes, not queues the datapath is configured with.
 """
 
 import json
@@ -105,4 +110,10 @@ def meter_bands(policy, capacity_mbps):
 
 
 def queue_for_dscp(policy, dscp):
+    """The class's queue id — policy metadata only.
+
+    Nothing programs this queue (enforcement is meters, see the module
+    docstring); the lookup exists so policy consumers can read the
+    full class table.
+    """
     return int(class_for_dscp(policy, dscp)["queue_id"])

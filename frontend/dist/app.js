@@ -99,7 +99,7 @@ async function refreshShowcase(){
     const cf=d.conformal||{}; const art=cf.artifact||{}; const live=cf.live||{}; const wp=Object.entries(live.width_by_path||{});
     card('Conformal intervals', art.nominal_coverage?'live':'no data',
       art.nominal_coverage?('Coverage guarantee '+num(Number(art.nominal_coverage)*100,0)+'% · radius '+num(Number(art.radius_percentage_points))+' pts'):'No calibration artifact yet',
-      art.heldout_coverage?('Calibrated on '+((art.provenance||{}).capture||'a recorded capture')+' · held-out coverage '+num(Number(art.heldout_coverage.coverage)*100,1)+'% at mean width '+num(Number(art.heldout_coverage.mean_width))):'',
+      art.eval_capture_coverage?('Calibrated on '+((art.provenance||{}).capture||'a recorded capture')+' · separate-capture coverage '+num(Number(art.eval_capture_coverage.coverage)*100,1)+'% at mean width '+num(Number(art.eval_capture_coverage.mean_width))):'',
       {stats:[['Calibration rows',art.calibration_rows!=null?art.calibration_rows:'—'],['Live intervals',live.rows||0],['Gate held',live.gate_hold||0],['Gate passed',live.gate_pass||0]],
        compare:wp.length?{title:'Mean width by path',items:wp.map(([k,v])=>['Path '+k,Number(v),' pts'])}:null,
        href:'/conformal',openLabel:'Full record',

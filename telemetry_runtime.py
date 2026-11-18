@@ -11,6 +11,12 @@ import re
 import threading
 
 
+# Field semantics: "active_flows" counts installed OpenFlow flow-table
+# entries on the reporting switch port (from flow-stats replies) — it
+# is a rule count, NOT a count of application or transport flows. The
+# all-links recorder does not measure it and writes 0 (= not measured).
+# The name itself is frozen: it is a column of the model's feature
+# schema and of every recorded capture.
 TELEMETRY_FIELDS = [
 	"timestamp",
 	"link_id",

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """
+LEGACY — retained for reference only. This is the project's first
+learning-switch step; it is not used by the live controller
+(path_switch_controller.py), the experiments or the dashboard.
+
 SDN Project - Step 2: Basic Ryu Controller
 
 This is a simple learning switch controller. Its only job right now

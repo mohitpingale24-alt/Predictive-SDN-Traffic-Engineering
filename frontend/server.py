@@ -838,6 +838,8 @@ def conformal_detail():
             aci_heldout_coverage=_num(aci_heldout.get('coverage')),
             eval_capture_n=eval_cov.get('n'),
             eval_capture_coverage=_num(eval_cov.get('coverage')),
+            eval_capture_mean_width=_num(eval_cov.get('mean_width')),
+            coverage_basis=artifact.get('coverage_basis'),
             aci_gamma=_num(aci.get('gamma')),
             aci_initial_radius=_num(
                 aci.get('initial_radius_percentage_points')),
@@ -2493,7 +2495,9 @@ def qos_detail():
                        if not entry['metered']],
             metered_share=sum(entry['share'] for entry in metered),
             dscps_claimed=sum(len(entry['dscp']) for entry in classes),
-            queues=sorted({entry['queue_id'] for entry in classes}),
+            enforcement='OpenFlow meters (rate caps) only — no '
+                        'SetQueue priority queues are programmed; '
+                        'queue ids in the policy are metadata',
             meters=sorted({entry['meter_id'] for entry in metered}),
             capacities=capacities,
             qos_switch=wiring.get('SDN_QOS')),

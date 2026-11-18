@@ -252,3 +252,55 @@ exist yet (see README reproducibility status).
 4. Validation-tuned reactive / EWMA baselines (finding 10).
 5. Published VM provisioning (script + checksums) to make live runs
    reproducible by others (finding 13).
+
+## Closing batch (post-41f10d1 audit)
+
+Six open items from the updated external review, closed after the P0
+fixes above. No new features.
+
+1. **Conformal split, completed.** The calibration CLI now requires
+   `--eval-capture`: the radius is fitted on the calibration capture
+   and the coverage the artifact reports (`eval_capture_coverage`) is
+   measured on a separate untouched capture. The artifact names its
+   basis in `coverage_basis`; same-capture held-out coverage is
+   labelled a diagnostic in the artifact, the detail page and the
+   showcase cards. The committed artifact was regenerated through the
+   split CLI (calibrate run-01, evaluate run-02) and reproduces the
+   previous values exactly (radius 26.8018, eval coverage 0.8621,
+   n = 174). SCOPUS_READINESS.md no longer presents the 0.81
+   same-capture figure as the evidence and states the gate limitation
+   plainly: across the audited live runs the confidence gate held 690
+   intervals and passed 0 — with this radius it is arithmetically
+   unable to activate, and live decisions fell back to measured
+   signals.
+2. **Training windows are segment-bounded.** `build_features.py` now
+   splits each link's series into contiguous segments (any delta
+   larger than the sampling step starts a new segment) and computes
+   targets and exact-time history inside one segment only, mirroring
+   the runtime's contiguous-history rule. A window can no longer span
+   a sampling gap or a capture-concatenation seam.
+   (`tests/test_build_features.py`.)
+3. **`active_flows` relabelled everywhere it is presented.** The field
+   counts installed OpenFlow flow-table entries by output port (s1);
+   the all-links file records 0 = not measured. Dashboard columns now
+   read "flow-table entries"; the semantics are stated at the counting
+   site, in `telemetry_runtime.py`, `cnt-ml/README.md` and
+   `pool_telemetry.py`. The column name itself is frozen (model
+   feature schema).
+4. **Orphan closure.** `failure_recovery.completed_reports()` is now
+   wired in: on link_up the controller writes a `recovery_complete`
+   failures.csv row built from it — the recovery detail page's data
+   source for finished outages (guarded by
+   `CompletedReportsWiringTests`). README's code map states plainly
+   that `topology_graph.py`, `topologies_v2.py` and the GNN are
+   offline research modules, not the live control path, and marks
+   `basic_switch.py` legacy (also marked in its own header).
+5. **QoS wording.** Enforcement is OpenFlow meters (rate caps); no
+   SetQueue priority queueing exists. The QoS detail page now says so
+   ("Enforcement" row, queue columns labelled "Queue ID (metadata)"),
+   as do `qos_policy.py`'s docstring and the QoS method page.
+6. **DM caveat.** RESEARCH.md and the `forecast_stats` /
+   `dm_across_runs` outputs (`dm_caveat`) now state that pooled DM
+   figures are matched-workload evidence from live runs whose routing
+   changed the traffic being predicted — not a pure held-out forecast
+   comparison.

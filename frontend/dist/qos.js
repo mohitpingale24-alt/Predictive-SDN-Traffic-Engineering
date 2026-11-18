@@ -46,7 +46,7 @@ function render(data) {
     ['Default class', data.default_class],
     ['Metered share', pct(summary.metered_share)],
     ['Unmetered classes', (summary.unmetered || []).join(', ') || '—'],
-    ['Queues used', (summary.queues || []).join(', ') || '—'],
+    ['Enforcement', summary.enforcement || 'OpenFlow meters (rate caps) only'],
     ['Meters used', (summary.meters || []).join(', ') || '—'],
   ]);
 
@@ -64,14 +64,14 @@ function render(data) {
   $('#band-table').innerHTML = `<thead><tr><th>Link capacity</th><th>Class</th><th>Meter</th><th>Rate</th><th>Rate</th><th>Burst</th></tr></thead><tbody>${bandRows.join('') || '<tr><td colspan="6">No meter bands derivable</td></tr>'}</tbody>`;
 
   const classes = data.classes || [];
-  $('#class-table').innerHTML = `<thead><tr><th>Class</th><th>DSCP</th><th>Share</th><th>Queue</th><th>Meter</th><th>Metered</th></tr></thead><tbody>${
+  $('#class-table').innerHTML = `<thead><tr><th>Class</th><th>DSCP</th><th>Share</th><th>Queue ID (metadata)</th><th>Meter</th><th>Metered</th></tr></thead><tbody>${
     classes.map(c => `<tr><td>${escapeText(c.name)}</td><td>${escapeText((c.dscp || []).join(', '))}</td><td>${c.share == null ? 'unmetered' : pct(c.share)}</td><td>${num(c.queue_id)}</td><td>${num(c.meter_id)}</td><td>${c.metered ? 'yes' : 'no'}</td></tr>`).join('')
     || '<tr><td colspan="6">No classes loaded</td></tr>'}</tbody>`;
 
   const dscpMap = data.dscp_map || [];
   const claimed = dscpMap.filter(d => d.claimed).length;
   $('#dscp-count').textContent = `${claimed} of ${dscpMap.length} code points are claimed by a class; the rest resolve to the default class`;
-  $('#dscp-table').innerHTML = `<thead><tr><th>DSCP</th><th>Resolves to class</th><th>Claimed by policy</th><th>Queue</th><th>Meter</th></tr></thead><tbody>${
+  $('#dscp-table').innerHTML = `<thead><tr><th>DSCP</th><th>Resolves to class</th><th>Claimed by policy</th><th>Queue ID (metadata)</th><th>Meter</th></tr></thead><tbody>${
     dscpMap.map(d => `<tr><td>${num(d.dscp)}</td><td>${escapeText(d.class_name)}</td><td>${d.claimed ? 'yes' : 'no — default'}</td><td>${num(d.queue_id)}</td><td>${num(d.meter_id)}</td></tr>`).join('')
     || '<tr><td colspan="5">No DSCP map computed</td></tr>'}</tbody>`;
 

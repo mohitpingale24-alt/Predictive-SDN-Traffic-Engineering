@@ -18,7 +18,11 @@ both scored against the identical (timestamp, link) actuals of one
 capture. Errors from different captures are never paired by row
 position — different controllers change their own future utilization,
 so position i in two runs is not a shared forecast target and a paired
-test across runs is meaningless.
+test across runs is meaningless. And even the valid same-target test
+carries a caveat (emitted as dm_caveat in the report): the errors come
+from live runs whose routing decisions changed the traffic being
+predicted, so the result is matched-workload evidence, not a pure
+held-out forecast comparison on intervention-free data.
 """
 
 import argparse
@@ -188,7 +192,14 @@ def compare_captures(capture_dirs, horizon_seconds=5):
                 cross_system_dm="not reported: different controllers induce "
                                 "different futures, so errors from different "
                                 "systems share no common target and cannot be "
-                                "paired for a Diebold-Mariano test")
+                                "paired for a Diebold-Mariano test",
+                dm_caveat="these Diebold-Mariano figures pool errors from "
+                          "live controller runs whose routing decisions "
+                          "changed the traffic being predicted: they are "
+                          "matched-workload evidence (identical realized "
+                          "targets, same intervention regime), not a pure "
+                          "held-out forecast comparison on "
+                          "intervention-free data")
 
 
 def main():

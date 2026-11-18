@@ -1,0 +1,4 @@
+timestamp,event,control_mode,old_path,new_path,signal_a,signal_b,reason
+1795005462.3633502,controller_start,predictive,,A,,,development default uses persistence unless SDN_ACTIVE_MODEL is set
+1795005507.4834301,reroute,predictive,A,B,92.823,46.4115,predictive projected policy A=92.82% B=46.41%
+1795005547.5593495,reroute,predictive,B,A,51.47200000000001,25.736,predictive projected policy A=51.47% B=25.74%

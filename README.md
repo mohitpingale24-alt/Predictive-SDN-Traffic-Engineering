@@ -120,5 +120,8 @@ After 32 valid sessions, generate corrected final evidence into a new directory:
 | `frontend/dist/` | Local topology, replay and comparison interface |
 | `experiments/live_runtime.py` | Isolated VM startup, single-run locking, cancellation and final verification |
 | `experiments/live_guest.py` | Linux guest entry point for the existing controller experiment |
+| `topology_graph.py` / `topologies_v2.py` | Offline research modules (discovered-graph and topology experiments); not imported by the live controller |
+| `cnt-ml/src/gnn_model.py` / `experiments/train_gnn.py` | Offline GNN forecasting research; not part of the live control path |
+| `basic_switch.py` | Legacy Ryu learning-switch example, retained for reference; not used by the controller, the experiments or the dashboard |
 
-Legacy standalone topology examples are retained, but the final comparison uses the topology in `experiments/run_experiment.py`. Historical filenames containing xgb refer to the scikit-learn Gradient Boosting artifact, not a verified native XGBoost deployment. GRU remains an offline comparison and is not integrated into live routing.
+The live control path is `path_switch_controller.py` with `telemetry_runtime.py`, `route_transition.py` / `openflow_routes.py` and `confidence_policy.py`. `topology_graph.py`, `topologies_v2.py` and the GNN are offline research/experiment modules — they inform the paper, they do not route traffic. Legacy standalone topology examples are retained, but the final comparison uses the topology in `experiments/run_experiment.py`. Historical filenames containing xgb refer to the scikit-learn Gradient Boosting artifact, not a verified native XGBoost deployment. GRU remains an offline comparison and is not integrated into live routing.

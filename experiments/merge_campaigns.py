@@ -98,7 +98,11 @@ def pooled_forecast(run_dirs):
                 actual = telemetry.get((int(round(stamp)) + 5, row['link_id']))
                 if actual is not None:
                     run_pairs.append((cur, gb, actual))
-        per_run[run_dir.name] = run_pairs
+        # Key by campaign/system/run: campaign-02 and campaign-03 runs
+        # share directory names, and keying by name alone silently drops
+        # half the runs from the sign test.
+        key = f'{run_dir.parent.parent.name}/{run_dir.parent.name}/{run_dir.name}'
+        per_run[key] = run_pairs
         pairs.extend(run_pairs)
     return pairs, per_run
 
@@ -145,7 +149,7 @@ def forecast_report(run_dirs, label):
                   gb_rmse=round(rmse(lambda c, g: g), 3),
                   dm_mean_squared_loss_diff=round(mean_diff, 2),
                   dm_statistic=round(dm_star, 3), dm_p_value=round(p_value, 4),
-                  gb_squared_loss_wins=f'{wins}/{total}', sign_test_p=round(sign_p, 4))
+                  gb_squared_loss_wins=f'{wins}/{total}', sign_test_p=round(sign_p, 6))
     print(f"forecast [{label}]: n={report['samples']}  "
           f"MAE persistence {report['persistence_mae']} vs GB {report['gb_mae']}  "
           f"RMSE persistence {report['persistence_rmse']} vs GB {report['gb_rmse']}  "
@@ -185,6 +189,11 @@ def main():
         return
 
     build_combined(base, extra, combined)
+    if (output / 'network_statistics.csv').exists():
+        # The analyzer refuses an existing output directory; this folder
+        # only ever holds this script's own generated analysis.
+        import shutil
+        shutil.rmtree(output)
     analyzer = Path(__file__).parent / 'analyze_results.py'
     subprocess.run([sys.executable, str(analyzer), '--runs-root', str(combined),
                     '--output-dir', str(output), '--data-only'], check=True)

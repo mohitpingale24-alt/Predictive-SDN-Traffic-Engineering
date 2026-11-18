@@ -20,6 +20,29 @@ def attach_timestamp_target(group, horizon_seconds=HORIZON_SECONDS):
 	return group.merge(future, on="target_timestamp", how="left", validate="many_to_one")
 
 
+def contiguous_segments(group):
+	"""Split one link's series wherever the sampling step breaks.
+
+	The step is the smallest positive timestamp delta in the series
+	(the sampling quantum). Any larger delta is a gap: a missing
+	stretch inside one capture, or the seam where two captures were
+	concatenated into one file. History restarts at every segment
+	boundary, exactly as the live FeatureHistory restarts on a gap —
+	a lag or rolling window may never reach across a seam and pose
+	another run's samples as this run's past. Segments too short for
+	the longest window simply yield no rows after the NaN drop.
+	"""
+	group = group.sort_values("timestamp").reset_index(drop=True)
+	stamps = group["timestamp"].astype(int)
+	deltas = stamps.diff()
+	positive = deltas[deltas > 0]
+	if positive.empty:
+		return [group]
+	step = positive.min()
+	breaks = (deltas > step).cumsum()
+	return [part.reset_index(drop=True) for _, part in group.groupby(breaks)]
+
+
 def attach_time_history(group):
 	"""Lag and rolling features looked up by timestamp, never row position.
 
@@ -55,13 +78,13 @@ def main():
 	processed_links = []
 
 	for link_id, group in df.groupby("link_id"):
-		# PHASE C — Prediction target
-		group = attach_timestamp_target(group)
-
-		# PHASE D — Feature engineering (exact-time history)
-		group = attach_time_history(group)
-
-		processed_links.append(group)
+		# PHASE C/D run per contiguous segment: targets and history
+		# are computed inside one unbroken sampling run, never across
+		# a gap or a concatenation seam between captures.
+		for segment in contiguous_segments(group):
+			segment = attach_timestamp_target(segment)
+			segment = attach_time_history(segment)
+			processed_links.append(segment)
 
 	df_feat = pd.concat(processed_links, ignore_index=True)
 

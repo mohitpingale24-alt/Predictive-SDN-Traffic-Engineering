@@ -420,6 +420,28 @@ class PathSwitchController(app_manager.RyuApp):
                 'path': path, 'active_path': self.active_path,
                 'detail': 'recovered=%s' % (record is not None)})
             self.logger.info("Link restored: %s", link_id)
+            if record is not None:
+                # The completed-recovery row is the recovery detail
+                # page's data source for finished outages: the
+                # tracker's own measured timings and outage loss,
+                # written as their own failures.csv event.
+                report = next(
+                    (r for r in self.failure_tracker.completed_reports()
+                     if r['link_id'] == link_id
+                     and r['down_at'] == record['down_at']), None)
+                if report is not None:
+                    self.failure_recorder.append({
+                        'timestamp': now, 'event': 'recovery_complete',
+                        'link_id': link_id, 'path': path,
+                        'active_path': self.active_path,
+                        'detail': 'reroute=%s recover=%s loss_mean=%s '
+                                  'loss_max=%s from=%s to=%s' % (
+                                      report['time_to_reroute_seconds'],
+                                      report['time_to_recover_seconds'],
+                                      report['mean_packet_loss_during_outage_pct'],
+                                      report['max_packet_loss_during_outage_pct'],
+                                      report['reroute_from'],
+                                      report['reroute_to'])})
 
     def _log_explanation(self, now, source, reason, signals, candidate):
         if not self._topnotch:
@@ -673,6 +695,9 @@ class PathSwitchController(app_manager.RyuApp):
 
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
     def flow_stats_reply_handler(self, ev):
+        # Counts installed flow-table entries on s1 by output port.
+        # This is the telemetry field named active_flows: a rule
+        # count, not an application-flow count.
         if ev.msg.datapath.id != 1:
             return
         counts = {2: 0, 3: 0}
@@ -705,6 +730,9 @@ class PathSwitchController(app_manager.RyuApp):
                 tx_packets=stat.tx_packets,
                 rx_dropped=stat.rx_dropped,
                 tx_dropped=stat.tx_dropped,
+                # Not measured per link: 0 means "not measured" here.
+                # (active_flows counts s1 flow-table entries — see
+                # flow_stats_reply_handler — not application flows.)
                 active_flows=0,
             )
             if sample is None:
@@ -733,6 +761,8 @@ class PathSwitchController(app_manager.RyuApp):
                 tx_packets=stat.tx_packets,
                 rx_dropped=stat.rx_dropped,
                 tx_dropped=stat.tx_dropped,
+                # Flow-table entries by output port (rule count, not
+                # application flows — see flow_stats_reply_handler).
                 active_flows=self.flow_counts.get(stat.port_no, 0),
             )
             if sample is None:

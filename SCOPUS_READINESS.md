@@ -35,10 +35,21 @@ configuration-identical before computing anything.
   retrain, not more diamond4 runs.
 - **Novelty:** runs add statistical strength, not contribution. The
   paper's novelty case is the conformal-gated predictive controller
-  (held-out conformal coverage measured honestly at 0.81 against 90%
-  nominal — the intervals undercover out of sample, reported as a
-  result, not hidden), the intervention-censoring analysis of forecast
-  evaluation, and the honest negative results — framed in RESEARCH.md.
+  (coverage reported on a separate untouched evaluation capture:
+  0.862 at 90% nominal, n = 174 — the intervals undercover out of
+  sample, reported as a result, not hidden; the 0.81 same-capture
+  held-out figure is a diagnostic, not the evidence), the
+  intervention-censoring analysis of forecast evaluation, and the
+  honest negative results — framed in RESEARCH.md.
+- **The confidence gate has never passed live.** Across the audited
+  live runs the gate held 690 intervals and passed 0: with the honest
+  radius of 26.8 points, the highest lower bound a forecast can
+  produce is 100 − 26.8 = 73.2, below the 85% threshold, so the gate
+  is arithmetically unable to activate with this calibration. Every
+  live routing decision therefore fell back to the measured signals,
+  and the paper must present the gate as a designed-and-measured
+  mechanism whose activation awaits a sharper forecaster — not as a
+  mechanism observed working live.
 
 ## Venue reality check
 Scopus indexes venues, not individual papers. Target a Scopus-indexed

@@ -1,0 +1,142 @@
+{
+  "campaign": "campaign-03",
+  "extends": "campaign-02",
+  "controller_sha256": "3e3ab24d57f63a41d516389facf2ea9ed27ad17f2255e0a0b0e26942d1298377",
+  "systems": [
+    "static",
+    "reactive",
+    "predictive-baseline",
+    "predictive-ml"
+  ],
+  "repetitions_per_system": 8,
+  "runs": {
+    "static/run-01": {
+      "status": "complete",
+      "seconds": 107.9
+    },
+    "static/run-02": {
+      "status": "complete",
+      "seconds": 107.8
+    },
+    "static/run-03": {
+      "status": "complete",
+      "seconds": 107.6
+    },
+    "static/run-04": {
+      "status": "complete",
+      "seconds": 107.6
+    },
+    "static/run-05": {
+      "status": "complete",
+      "seconds": 107.8
+    },
+    "static/run-06": {
+      "status": "complete",
+      "seconds": 108.0
+    },
+    "static/run-07": {
+      "status": "complete",
+      "seconds": 107.7
+    },
+    "static/run-08": {
+      "status": "complete",
+      "seconds": 107.6
+    },
+    "reactive/run-01": {
+      "status": "complete",
+      "seconds": 107.7
+    },
+    "reactive/run-02": {
+      "status": "complete",
+      "seconds": 107.6
+    },
+    "reactive/run-03": {
+      "status": "complete",
+      "seconds": 108.0
+    },
+    "reactive/run-04": {
+      "status": "complete",
+      "seconds": 107.6
+    },
+    "reactive/run-05": {
+      "status": "complete",
+      "seconds": 107.7
+    },
+    "reactive/run-06": {
+      "status": "complete",
+      "seconds": 107.7
+    },
+    "reactive/run-07": {
+      "status": "complete",
+      "seconds": 107.9
+    },
+    "reactive/run-08": {
+      "status": "complete",
+      "seconds": 107.8
+    },
+    "predictive-baseline/run-01": {
+      "status": "complete",
+      "seconds": 107.7
+    },
+    "predictive-baseline/run-02": {
+      "status": "complete",
+      "seconds": 107.7
+    },
+    "predictive-baseline/run-03": {
+      "status": "complete",
+      "seconds": 107.7
+    },
+    "predictive-baseline/run-04": {
+      "status": "complete",
+      "seconds": 107.6
+    },
+    "predictive-baseline/run-05": {
+      "status": "complete",
+      "seconds": 107.7
+    },
+    "predictive-baseline/run-06": {
+      "status": "complete",
+      "seconds": 107.7
+    },
+    "predictive-baseline/run-07": {
+      "status": "complete",
+      "seconds": 108.1
+    },
+    "predictive-baseline/run-08": {
+      "status": "complete",
+      "seconds": 107.7
+    },
+    "predictive-ml/run-01": {
+      "status": "complete",
+      "seconds": 107.8
+    },
+    "predictive-ml/run-02": {
+      "status": "complete",
+      "seconds": 107.9
+    },
+    "predictive-ml/run-03": {
+      "status": "complete",
+      "seconds": 107.8
+    },
+    "predictive-ml/run-04": {
+      "status": "complete",
+      "seconds": 107.8
+    },
+    "predictive-ml/run-05": {
+      "status": "complete",
+      "seconds": 107.8
+    },
+    "predictive-ml/run-06": {
+      "status": "complete",
+      "seconds": 107.8
+    },
+    "predictive-ml/run-07": {
+      "status": "complete",
+      "seconds": 107.8
+    },
+    "predictive-ml/run-08": {
+      "status": "complete",
+      "seconds": 107.9
+    }
+  }
+}

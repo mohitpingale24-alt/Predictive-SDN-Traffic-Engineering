@@ -214,3 +214,22 @@ class InitAttributeOrderTests(unittest.TestCase):
                  and isinstance(n.value, ast.Name) and n.value.id == "self"}
         offenders = sorted({a for a in offenders if a in later})
         self.assertEqual(offenders, [])
+
+
+class CompletedReportsWiringTests(unittest.TestCase):
+    """completed_reports() must have a production call site.
+
+    It is the recovery detail page's data source for finished outages
+    (the controller writes a recovery_complete failures.csv row from
+    it on link_up). An AST scan keeps it from silently becoming a
+    dead API again: some method of the controller must call it.
+    """
+
+    def test_controller_calls_completed_reports(self):
+        with open(os.path.join(ROOT, "path_switch_controller.py")) as fh:
+            tree = ast.parse(fh.read())
+        calls = [node for node in ast.walk(tree)
+                 if isinstance(node, ast.Call)
+                 and isinstance(node.func, ast.Attribute)
+                 and node.func.attr == "completed_reports"]
+        self.assertTrue(calls)

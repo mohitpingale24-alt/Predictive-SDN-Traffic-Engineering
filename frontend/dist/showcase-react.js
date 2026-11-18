@@ -122,9 +122,9 @@
     card('Conformal intervals', art.nominal_coverage ? 'live' : 'no data',
       art.nominal_coverage ? 'Coverage guarantee ' + fmt(Number(art.nominal_coverage) * 100, 0) + '% · radius ' + fmt(Number(art.radius_percentage_points)) + ' pts'
                            : 'No calibration artifact yet',
-      art.heldout_coverage
-        ? 'Calibrated on ' + ((art.provenance || {}).capture || 'a recorded capture') + ' · held-out coverage ' +
-          fmt(Number(art.heldout_coverage.coverage) * 100, 1) + '% at mean width ' + fmt(Number(art.heldout_coverage.mean_width))
+      art.eval_capture_coverage
+        ? 'Calibrated on ' + ((art.provenance || {}).capture || 'a recorded capture') + ' · separate-capture coverage ' +
+          fmt(Number(art.eval_capture_coverage.coverage) * 100, 1) + '% at mean width ' + fmt(Number(art.eval_capture_coverage.mean_width))
         : '',
       { stats: [['Calibration rows', art.calibration_rows != null ? art.calibration_rows : '—'],
                 ['Live intervals', live.rows || 0],

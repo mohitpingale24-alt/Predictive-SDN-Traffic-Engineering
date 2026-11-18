@@ -124,6 +124,7 @@
     "coverage": 0.8116,
     "mean_width": 43.4658
   },
+  "coverage_basis": "reported coverage is eval_capture_coverage, measured on the separate untouched evaluation capture; heldout_coverage is a same-capture chronological diagnostic only",
   "provenance": {
     "capture": "final-evaluation-artifacts/campaign-02/predictive-ml/run-01",
     "horizon_seconds": 5,

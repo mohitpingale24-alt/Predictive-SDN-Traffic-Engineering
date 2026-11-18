@@ -56,6 +56,11 @@ def compare_systems(dir_a, dir_b, horizon_seconds=5.0):
         "cross_system_dm": "not computed: the two controllers induce "
                            "different futures, so their errors share no "
                            "common target and cannot be paired",
+        "dm_caveat": "the per-system Diebold-Mariano figures pool errors "
+                     "from live controller runs whose routing decisions "
+                     "changed the traffic being predicted: matched-"
+                     "workload evidence, not a pure held-out forecast "
+                     "comparison on intervention-free data",
         "per_system": {
             os.path.basename(os.path.normpath(dir_a)): _system_result(dir_a, horizon_seconds),
             os.path.basename(os.path.normpath(dir_b)): _system_result(dir_b, horizon_seconds),

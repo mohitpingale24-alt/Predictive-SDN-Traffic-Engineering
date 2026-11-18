@@ -53,7 +53,7 @@ function render(data) {
 
   $('#link-bars').innerHTML = bars(links.map(p => [p.link + ' peak', (p.utilization || {}).max]), '%')
     || 'No all-link telemetry recorded.';
-  $('#link-table').innerHTML = `<thead><tr><th>Link</th><th>Rows</th><th>Mean util</th><th>SD</th><th>Min</th><th>Peak util</th><th>Peak at</th><th>Latest util</th><th>Mean throughput</th><th>Max packet loss</th><th>Max active flows</th></tr></thead><tbody>${
+  $('#link-table').innerHTML = `<thead><tr><th>Link</th><th>Rows</th><th>Mean util</th><th>SD</th><th>Min</th><th>Peak util</th><th>Peak at</th><th>Latest util</th><th>Mean throughput</th><th>Max packet loss</th><th>Max flow-table entries</th></tr></thead><tbody>${
     links.map(p => `<tr><td>${escapeText(p.link)}</td><td>${num((p.utilization || {}).n)}</td><td>${fmt((p.utilization || {}).mean, 1)}%</td><td>${fmt((p.utilization || {}).sd, 1)}</td><td>${fmt((p.utilization || {}).min, 1)}%</td><td>${fmt((p.utilization || {}).max, 1)}%</td><td>${escapeText(p.peak_time || '—')}</td><td>${fmt((p.latest || {}).utilization, 2)}%</td><td>${fmt((p.throughput || {}).mean, 3)}</td><td>${fmt((p.packet_loss || {}).max, 3)}</td><td>${fmt((p.active_flows || {}).max, 0)}</td></tr>`).join('')
     || '<tr><td colspan="11">No all-link telemetry recorded</td></tr>'}</tbody>`;
 
@@ -70,7 +70,7 @@ function render(data) {
 
   const recent = data.recent || [];
   $('#recent-count').textContent = `Showing the latest ${recent.length} of ${num(s.rows)} (limit ${num(data.recent_limit)})`;
-  $('#recent-table').innerHTML = `<thead><tr><th>Time</th><th>Run</th><th>Link</th><th>Utilization</th><th>Throughput</th><th>Packet loss</th><th>Active flows</th></tr></thead><tbody>${
+  $('#recent-table').innerHTML = `<thead><tr><th>Time</th><th>Run</th><th>Link</th><th>Utilization</th><th>Throughput</th><th>Packet loss</th><th>Flow-table entries</th></tr></thead><tbody>${
     recent.slice().reverse().map(r => `<tr><td>${escapeText(r.time || '—')}</td><td>${escapeText(shortRun(r.run))}</td><td>${escapeText(r.link_id || '—')}</td><td>${fmt(r.utilization, 2)}%</td><td>${fmt(r.throughput, 3)}</td><td>${fmt(r.packet_loss, 3)}</td><td>${fmt(r.active_flows, 0)}</td></tr>`).join('')
     || '<tr><td colspan="7">No all-link telemetry recorded</td></tr>'}</tbody>`;
 

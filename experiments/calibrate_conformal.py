@@ -1,19 +1,27 @@
-"""Build the conformal calibration artifact from a recorded capture.
+"""Build the conformal calibration artifact from recorded captures.
 
 Pairs each recorded forecast with the actual utilization one horizon
 later (exact-timestamp alignment, the project's contract), then fits
 split-conformal and ACI calibrators at the requested coverage.
 
-The capture's pairs are split chronologically: the first portion
-calibrates the radius, the remaining portion is held out and used only
-to MEASURE coverage. Reporting coverage on the calibration rows
-themselves (the previous behaviour) is not evidence — the split-
-conformal radius is by construction a quantile of those very
-residuals, so in-sample coverage lands near nominal automatically.
-An optional second capture (--eval-capture) is evaluated untouched as
-an additional, fully independent check.
+Calibration and evaluation are separate capture sets:
 
-Usage: python3 -m experiments.calibrate_conformal CAPTURE_DIR [-o OUT.json]
+- The radius is FIT on the calibration capture only (its pairs are
+  split chronologically; the first portion calibrates, the remainder
+  is a same-capture held-out diagnostic).
+- The coverage the artifact REPORTS (``eval_capture_coverage``) is
+  measured on a second, untouched capture passed with the required
+  ``--eval-capture`` flag. Same-capture numbers — held-out or not —
+  share the calibration capture's workload and controller behaviour,
+  so they are diagnostics, never the headline evidence.
+
+Reporting coverage on the calibration rows themselves (the original
+behaviour) is not evidence at all: the split-conformal radius is by
+construction a quantile of those very residuals, so in-sample
+coverage lands near nominal automatically.
+
+Usage: python3 -m experiments.calibrate_conformal CALIBRATION_CAPTURE
+       --eval-capture EVALUATION_CAPTURE [-o OUT.json]
 """
 
 import argparse
@@ -75,6 +83,13 @@ def build_artifact(capture, horizon=5, coverage=0.9, gamma=0.01,
         heldout_rows=len(heldout),
         heldout_coverage=coverage_report(heldout_intervals,
                                          [a for _, a in heldout]),
+        coverage_basis=("reported coverage is eval_capture_coverage, "
+                        "measured on the separate untouched evaluation "
+                        "capture; heldout_coverage is a same-capture "
+                        "chronological diagnostic only") if eval_capture
+                       else ("no evaluation capture supplied: no coverage "
+                             "is reported; heldout_coverage is a "
+                             "same-capture chronological diagnostic only"),
         provenance=dict(capture=str(capture), horizon_seconds=horizon,
                         pairing="exact timestamp + horizon in telemetry.csv",
                         split="chronological: first %.0f%% calibrate, rest held out"
@@ -117,7 +132,9 @@ def main():
     parser.add_argument("--coverage", type=float, default=0.9)
     parser.add_argument("--gamma", type=float, default=0.01)
     parser.add_argument("--calibration-fraction", type=float, default=0.6)
-    parser.add_argument("--eval-capture")
+    parser.add_argument("--eval-capture", required=True,
+                        help="separate untouched capture the reported "
+                             "coverage is measured on (never fitted)")
     parser.add_argument("-o", "--output", default=str(ROOT / "cnt-ml" / "models" / "conformal_calibration.json"))
     args = parser.parse_args()
 
@@ -129,7 +146,8 @@ def main():
     output.write_text(json.dumps(artifact, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({k: artifact[k] for k in
                       ("method", "nominal_coverage", "radius_percentage_points",
-                       "calibration_rows", "heldout_rows", "heldout_coverage")},
+                       "calibration_rows", "heldout_rows", "heldout_coverage",
+                       "eval_capture_coverage", "coverage_basis")},
                      indent=2))
 
 

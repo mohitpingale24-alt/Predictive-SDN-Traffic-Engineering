@@ -432,6 +432,18 @@ class ConformalHeldOutTests(unittest.TestCase):
         self.assertIn("heldout_coverage", artifact)
         self.assertNotIn("empirical_coverage_on_calibration", artifact)
 
+    def test_artifact_reports_coverage_from_a_separate_capture(self):
+        from calibrate_conformal import build_artifact
+        base = (ROOT / "final-evaluation-artifacts" / "campaign-02"
+                / "predictive-ml")
+        artifact = build_artifact(base / "run-01",
+                                  eval_capture=str(base / "run-02"))
+        self.assertIn("eval_capture_coverage", artifact)
+        self.assertIn("eval_capture_coverage", artifact["coverage_basis"])
+        bare = build_artifact(base / "run-01")
+        self.assertNotIn("eval_capture_coverage", bare)
+        self.assertIn("no evaluation capture", bare["coverage_basis"])
+
 
 # --- Finding: GNN windows crossed gaps and split boundaries ---------------
 

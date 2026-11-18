@@ -1,31 +1,35 @@
 {
   "links": [
     "S1-S2",
-    "S1-S3"
+    "S1-S3",
+    "S2-S4",
+    "S3-S4",
+    "S5-S1",
+    "S6-S4"
   ],
   "horizon_steps": 5,
-  "train_snapshots": 59,
-  "test_snapshots": 28,
+  "train_snapshots": 174,
+  "test_snapshots": 77,
   "boundary_purged_snapshots": 5,
-  "initial_loss": 2.5761,
-  "final_loss": 0.264,
+  "initial_loss": 2.6807,
+  "final_loss": 0.3015,
   "gnn": {
-    "mae": 18.3944,
-    "rmse": 27.3651
+    "mae": 4.4513,
+    "rmse": 7.8217
   },
   "persistence": {
-    "mae": 14.8745,
-    "rmse": 26.1071
+    "mae": 3.138,
+    "rmse": 7.9728
   },
   "ridge_same_features": {
-    "mae": 26.2476,
-    "rmse": 31.3138
+    "mae": 35.6279,
+    "rmse": 36.6508
   },
   "diebold_mariano_gnn_vs_persistence": {
-    "n": 56,
-    "mean_loss_diff": 67.2706,
-    "dm_stat": 0.688,
-    "p_value": 0.491465,
+    "n": 462,
+    "mean_loss_diff": -2.3875,
+    "dm_stat": -0.7344,
+    "p_value": 0.462732,
     "significant_5pct": false
   }
 }
