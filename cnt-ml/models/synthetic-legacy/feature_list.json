@@ -1,0 +1,30 @@
+{
+  "features": [
+    "utilization",
+    "throughput",
+    "delay",
+    "packet_loss",
+    "active_flows",
+    "util_lag_1",
+    "util_lag_2",
+    "util_lag_3",
+    "util_lag_5",
+    "util_lag_10",
+    "util_ma_5s",
+    "util_ma_10s",
+    "util_slope"
+  ],
+  "target": "target_util",
+  "horizon_seconds": 5,
+  "target_alignment": "exact_timestamp",
+  "artifact_status": "stale_requires_real_retraining",
+  "engine": "sklearn_gbdt",
+  "selected_parameters": {
+    "n_estimators": 300,
+    "max_depth": 5,
+    "learning_rate": 0.03,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8
+  },
+  "validation_rmse": 9.459499887075006
+}

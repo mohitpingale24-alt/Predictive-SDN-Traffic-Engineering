@@ -13,27 +13,43 @@ rng = np.random.default_rng(SEED)
 
 def generate_link_series(n_samples, link_id):
 	t = np.arange(n_samples)
+	phase = 0.0 if link_id == LINKS[0] else np.pi / 2
 
-	baseline = 15 + 10 * np.sin(t / 600) + rng.normal(0, 1.5, n_samples)
-	ramp = np.linspace(0, 25, n_samples)
-	utilization = baseline + ramp
+	# Multiple timescales plus a bounded random walk avoid a nearly straight,
+	# globally increasing series that makes linear extrapolation unrealistically
+	# easy. The second link uses a phase offset to represent competing paths.
+	baseline = 28 + 10 * np.sin(t / 140 + phase) + 6 * np.sin(t / 37 + phase / 2)
+	random_walk = np.cumsum(rng.normal(0, 0.18, n_samples))
+	random_walk -= pd.Series(random_walk).rolling(300, min_periods=1).mean().to_numpy()
+	utilization = baseline + random_walk + rng.normal(0, 1.8, n_samples)
 
-	n_bursts = max(1, n_samples // 400)
-	burst_starts = rng.choice(n_samples - 60, size=n_bursts, replace=False)
+	# Place bursts throughout the complete experiment (including every temporal
+	# split), with sharp starts/stops and nonlinear decay.
+	burst_starts = np.arange(90, n_samples - 90, 180)
+	burst_starts = np.clip(burst_starts + rng.integers(-25, 26, len(burst_starts)), 0, n_samples - 80)
 	for start in burst_starts:
-		length = rng.integers(20, 60)
-		height = rng.uniform(25, 55)
-		window = np.sin(np.linspace(0, np.pi, length)) * height
+		length = int(rng.integers(30, 80))
+		height = rng.uniform(35, 70)
+		attack = max(2, length // 8)
+		plateau = max(2, length // 3)
+		decay = length - attack - plateau
+		window = np.concatenate([
+			np.linspace(0, height, attack, endpoint=False),
+			np.full(plateau, height),
+			height * np.exp(-np.linspace(0, 4, decay)),
+		])
 		utilization[start:start + length] += window
 
-	n_sustained = max(1, n_samples // 1200)
-	sustained_starts = rng.choice(n_samples - 200, size=n_sustained, replace=False)
+	# Sustained competing-flow periods recur across train, validation, and test.
+	sustained_starts = np.arange(420, n_samples - 220, 720)
+	sustained_starts = sustained_starts + (60 if link_id == LINKS[1] else 0)
 	for start in sustained_starts:
-		length = rng.integers(100, 200)
-		utilization[start:start + length] += rng.uniform(30, 45)
+		length = int(rng.integers(120, 220))
+		utilization[start:start + length] += rng.uniform(35, 55)
 
-	n_drops = max(1, n_samples // 1500)
-	drop_points = rng.choice(n_samples - 50, size=n_drops, replace=False)
+	# Abrupt flow completion/drop events.
+	n_drops = max(2, n_samples // 900)
+	drop_points = rng.choice(n_samples - 60, size=n_drops, replace=False)
 	for point in drop_points:
 		length = rng.integers(20, 50)
 		utilization[point:point + length] *= rng.uniform(0.2, 0.5)
@@ -51,7 +67,6 @@ def generate_link_series(n_samples, link_id):
 	)
 	packet_loss = np.clip(packet_loss, 0, 100)
 
-	queue_occupancy = np.clip(utilization * 0.9 + rng.normal(0, 3, n_samples), 0, 100)
 
 	active_flows = np.round(2 + utilization / 15 + rng.normal(0, 0.5, n_samples)).astype(int)
 	active_flows = np.clip(active_flows, 1, None)
@@ -63,7 +78,6 @@ def generate_link_series(n_samples, link_id):
 		"throughput": np.round(throughput, 3),
 		"delay": np.round(delay, 3),
 		"packet_loss": np.round(packet_loss, 3),
-		"queue_occupancy": np.round(queue_occupancy, 3),
 		"active_flows": active_flows,
 	})
 

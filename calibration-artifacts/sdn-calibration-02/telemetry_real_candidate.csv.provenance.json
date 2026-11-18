@@ -1,0 +1,225 @@
+{
+  "experiment_id": "sdn-calibration-02",
+  "source_run": "/Users/mohit/College/SDN CP/calibration-artifacts/sdn-calibration-02",
+  "source_system": "reactive",
+  "source_model": "persistence",
+  "source_rows": 1480,
+  "normalized_rows": 1470,
+  "timestamp_origin": 1788428063.0,
+  "sampling_interval_seconds": 1.0,
+  "prediction_horizon_seconds": 5,
+  "measurement_sources": {
+    "utilization": "OpenFlow 1.3 port byte-counter deltas",
+    "throughput": "OpenFlow 1.3 port byte-counter deltas",
+    "delay": "nearest timestamped end-to-end ICMP RTT from ping.log",
+    "packet_loss": "iperf3 UDP lost_percent during traffic; OpenFlow drops outside traffic",
+    "active_flows": "OpenFlow 1.3 flow statistics"
+  },
+  "measurement_coverage": {
+    "delay_rows_from_ping": 1470,
+    "packet_loss_rows_from_iperf": 1456,
+    "excluded_rows_without_nearby_ping": 10,
+    "excluded_without_nearby_ping": [
+      {
+        "normalized_timestamp": 0,
+        "absolute_timestamp": 1788428063.0,
+        "link_id": "S1-S2",
+        "reason": "no ping RTT within 1.5 seconds"
+      },
+      {
+        "normalized_timestamp": 0,
+        "absolute_timestamp": 1788428063.0,
+        "link_id": "S1-S3",
+        "reason": "no ping RTT within 1.5 seconds"
+      },
+      {
+        "normalized_timestamp": 1,
+        "absolute_timestamp": 1788428064.0,
+        "link_id": "S1-S2",
+        "reason": "no ping RTT within 1.5 seconds"
+      },
+      {
+        "normalized_timestamp": 1,
+        "absolute_timestamp": 1788428064.0,
+        "link_id": "S1-S3",
+        "reason": "no ping RTT within 1.5 seconds"
+      },
+      {
+        "normalized_timestamp": 2,
+        "absolute_timestamp": 1788428065.0,
+        "link_id": "S1-S2",
+        "reason": "no ping RTT within 1.5 seconds"
+      },
+      {
+        "normalized_timestamp": 2,
+        "absolute_timestamp": 1788428065.0,
+        "link_id": "S1-S3",
+        "reason": "no ping RTT within 1.5 seconds"
+      },
+      {
+        "normalized_timestamp": 3,
+        "absolute_timestamp": 1788428066.0,
+        "link_id": "S1-S2",
+        "reason": "no ping RTT within 1.5 seconds"
+      },
+      {
+        "normalized_timestamp": 3,
+        "absolute_timestamp": 1788428066.0,
+        "link_id": "S1-S3",
+        "reason": "no ping RTT within 1.5 seconds"
+      },
+      {
+        "normalized_timestamp": 4,
+        "absolute_timestamp": 1788428067.0,
+        "link_id": "S1-S2",
+        "reason": "no ping RTT within 1.5 seconds"
+      },
+      {
+        "normalized_timestamp": 4,
+        "absolute_timestamp": 1788428067.0,
+        "link_id": "S1-S3",
+        "reason": "no ping RTT within 1.5 seconds"
+      }
+    ],
+    "ping_match_tolerance_seconds": 1.5
+  },
+  "feature_policy": {
+    "included": [
+      "utilization",
+      "throughput",
+      "delay",
+      "packet_loss",
+      "active_flows"
+    ],
+    "excluded": [
+      "queue_occupancy"
+    ],
+    "exclusion_reason": "OpenFlow provides no queue occupancy; placeholders cannot enter training."
+  },
+  "sampling_gap_report": "sampling_gaps.json",
+  "environment": {
+    "host_os": "Ubuntu 22.04.5 LTS",
+    "kernel": "5.15.0-190-generic",
+    "architecture": "aarch64",
+    "python": "3.10.12",
+    "mininet": "2.3.0",
+    "open_vswitch": "ovs-vswitchd (Open vSwitch) 2.17.12",
+    "ryu": "ryu-manager 4.34",
+    "iperf3": "iperf 3.9 (cJSON 1.7.13)",
+    "traffic_control": "tc utility, iproute2-5.15.0, libbpf 0.5.0"
+  },
+  "topology": {
+    "hosts": [
+      "h1",
+      "h2"
+    ],
+    "switches": [
+      "s1",
+      "s2",
+      "s3",
+      "s4"
+    ],
+    "path_a": {
+      "links": [
+        "s1-s2",
+        "s2-s4"
+      ],
+      "capacity_mbps": 10.0,
+      "delay_per_link": "2ms",
+      "max_queue_packets": 100,
+      "qdisc": "htb"
+    },
+    "path_b": {
+      "links": [
+        "s1-s3",
+        "s3-s4"
+      ],
+      "capacity_mbps": 20.0,
+      "delay_per_link": "4ms",
+      "max_queue_packets": 100,
+      "qdisc": "htb"
+    }
+  },
+  "controller": {
+    "mode": "reactive",
+    "model": "persistence",
+    "congestion_threshold_percent": 85.0,
+    "recovery_threshold_percent": 70.0,
+    "minimum_improvement_percent": 5.0,
+    "consecutive_signals": 3,
+    "cooldown_seconds": 15.0,
+    "prediction_horizon_seconds": 5,
+    "history_samples_required": 11,
+    "openflow_port": 6633
+  },
+  "traffic": {
+    "protocol": "UDP",
+    "generator": "iperf3",
+    "client": "h1",
+    "server": "h2",
+    "iperf_arguments": "-u -b <rate>M -t <duration> -J",
+    "ping_arguments": "-D -i 1",
+    "workload": [
+      {
+        "name": "warmup",
+        "rate_mbps": 3,
+        "duration_seconds": 15
+      },
+      {
+        "name": "ramp",
+        "rate_mbps": 7,
+        "duration_seconds": 15
+      },
+      {
+        "name": "near_threshold",
+        "rate_mbps": 9,
+        "duration_seconds": 15
+      },
+      {
+        "name": "congestion",
+        "rate_mbps": 13,
+        "duration_seconds": 25
+      },
+      {
+        "name": "recovery",
+        "rate_mbps": 5,
+        "duration_seconds": 20
+      }
+    ],
+    "repetitions": 8
+  },
+  "repository": {
+    "commit": "unavailable",
+    "branch": "unavailable",
+    "status_porcelain": [
+      "unavailable"
+    ],
+    "source_sha256": {
+      "path_switch_controller.py": "6fd6ce9074e5a4c94d15ea6005d0bf5750dc1befa01aa0e345a4af32124fd0cf",
+      "telemetry_runtime.py": "b9e83f94daf37b11515471ed6766fe4565ba1eeacaf672bb0fffe062a31d7159",
+      "topology.py": "ee97165de7949266e13fff06b0cf338a8be5f8e948ae88540c3f67172489363c",
+      "experiments/run_experiment.py": "051de2c5b9e5e7d2909f805babe0217ac760969569758de1dbd6a35b6f34a6af",
+      "experiments/prepare_real_dataset.py": "1e48f3146029bddcc5925dfcffb4dd5e9850e1da4ccbcbae7dd512a7aeca032b"
+    }
+  },
+  "dataset_preparation": {
+    "script": "prepare_real_dataset.py",
+    "script_sha256": "5da741072a3ee9fb87eb9735eed5d07e6294d016b47f5399022ead3b7a36da27",
+    "rtt_policy": "exclude rows with no ping RTT within 1.5 seconds; never impute",
+    "target_policy": "downstream labels must match exact timestamp t+5 seconds"
+  },
+  "sha256": {
+    "metadata.json": "e0f371f2d0fb99608b9cacacc6dc17bc897bf2f372054203efb0a44cdfbf724e",
+    "telemetry.csv": "f133300fbbad65e1a3b7446a27982fde7ab00da1ab5a4b68b67756d131a2745d",
+    "ping.log": "143ab157c0277281c9e0b68546b31b54eec592fee84058a47b353977bb5a09ef",
+    "control_events.csv": "1354592a4ad7fc28de85b8167ca2c6cfa1de8e8c726f836711e4c2d1883ac4dd",
+    "sampling_gaps.json": "cf1034eeb9d1a42274018f07e0882f8b5a0abb5ace02c5b949d2b5870a3b9488",
+    "telemetry_real_candidate.csv": "60b998e1d63114ed556035fa25cfec2887a8bfb5e461469d72077e2481d3684c"
+  },
+  "limitations": [
+    "Delay is end-to-end RTT shared across link rows, not one-way per-link delay.",
+    "iperf3 loss is a measured segment-level value repeated inside that segment.",
+    "Telemetry rows without a ping RTT within 1.5 seconds are excluded, never imputed.",
+    "Queue occupancy is intentionally excluded from the candidate and model features."
+  ]
+}

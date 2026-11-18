@@ -1,0 +1,35 @@
+{
+  "features": [
+    "utilization",
+    "throughput",
+    "delay",
+    "packet_loss",
+    "active_flows",
+    "util_lag_1",
+    "util_lag_2",
+    "util_lag_3",
+    "util_lag_5",
+    "util_lag_10",
+    "util_ma_5s",
+    "util_ma_10s",
+    "util_slope"
+  ],
+  "target": "target_util",
+  "horizon_seconds": 5,
+  "target_alignment": "exact_timestamp",
+  "artifact_status": "current",
+  "engine": "sklearn_gbdt",
+  "selected_parameters": {
+    "n_estimators": 100,
+    "max_depth": 2,
+    "learning_rate": 0.03,
+    "subsample": 1.0,
+    "colsample_bytree": 1.0,
+    "high_load_weight": 20
+  },
+  "validation_rmse": 15.32930151165113,
+  "validation_congestion_precision": 0.75,
+  "validation_congestion_recall": 1.0,
+  "validation_congestion_f1": 0.8571428571428571,
+  "selection_metric": "validation_congestion_f1_then_rmse"
+}

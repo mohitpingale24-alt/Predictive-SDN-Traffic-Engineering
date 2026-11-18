@@ -1,0 +1,5 @@
+Model,Threshold,TP,FP,FN,TN,Precision,Recall,F1
+Persistence,85.0,0,3,3,210,0.0,0.0,
+Linear Regression,85.0,0,0,3,213,,0.0,
+Gradient Boosting,85.0,3,0,0,213,1.0,1.0,1.0
+GRU,85.0,0,0,3,213,,0.0,

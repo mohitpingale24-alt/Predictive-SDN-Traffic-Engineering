@@ -1,0 +1,34 @@
+{
+  "window_size": 10,
+  "feature_cols": [
+    "utilization",
+    "throughput",
+    "delay",
+    "packet_loss",
+    "active_flows"
+  ],
+  "feature_mean": [
+    42.668052673339844,
+    4.2668304443359375,
+    8.556317329406738,
+    0.1703699827194214,
+    38.52739334106445,
+    4.841743469238281
+  ],
+  "feature_std": [
+    24.068273544311523,
+    2.4068984985351562,
+    9.967580795288086,
+    0.6103920340538025,
+    21.92051887512207,
+    1.7040835618972778
+  ],
+  "target_col": "target_util",
+  "target_alignment": "exact_timestamp",
+  "artifact_status": "stale_requires_real_retraining",
+  "model_mae": 4.6052,
+  "model_rmse": 8.4592,
+  "model_r2": 0.8903,
+  "inference_time_ms": 21.7158,
+  "epochs_trained": 45
+}

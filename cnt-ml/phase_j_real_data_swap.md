@@ -7,7 +7,7 @@ Phase J replaces the synthetic CSV with telemetry collected by the Ryu/Mininet n
 Save the real data as `data/raw/telemetry_raw.csv` with this exact schema:
 
 ```text
-timestamp,link_id,utilization,throughput,delay,packet_loss,queue_occupancy,active_flows
+timestamp,link_id,utilization,throughput,delay,packet_loss,active_flows
 ```
 
 Requirements:
@@ -18,7 +18,6 @@ Requirements:
 - `throughput`: non-negative Mbps
 - `delay`: non-negative milliseconds
 - `packet_loss`: 0-100 percent
-- `queue_occupancy`: 0-100 percent
 - `active_flows`: non-negative count
 - One row per link per sample, ideally every second
 - At least 1,000 rows recommended
@@ -27,9 +26,9 @@ Requirements:
 Example:
 
 ```csv
-timestamp,link_id,utilization,throughput,delay,packet_loss,queue_occupancy,active_flows
-1234567890,S1-S2,20.5,2.05,4.2,0.0,5.2,3
-1234567891,S1-S2,21.3,2.13,4.1,0.0,5.8,3
+timestamp,link_id,utilization,throughput,delay,packet_loss,active_flows
+1234567890,S1-S2,20.5,2.05,4.2,0.0,3
+1234567891,S1-S2,21.3,2.13,4.1,0.0,3
 ```
 
 ## Validate and rerun
@@ -44,9 +43,10 @@ python src/split_data.py
 python src/train_baselines.py
 python src/train_xgboost.py
 python src/evaluate.py
+python src/train_gru.py
 ```
 
-With Git Bash, the same phases can be run together:
+With Git Bash, the tabular phases can be run together:
 
 ```bash
 bash run_all_phases.sh
@@ -54,7 +54,15 @@ bash run_all_phases.sh
 
 Use `bash run_all_phases.sh --yes` to skip the confirmation prompt.
 
-The pipeline regenerates cleaned data, engineered features, chronological splits, model metrics, the XGBoost model, and evaluation plots. It never overwrites the raw CSV except when the networking team deliberately replaces it.
+The GRU is optional and remains a separate command because TensorFlow is not a
+required dependency for the tabular/controller path.
+
+The pipeline regenerates cleaned data, engineered features, purged chronological splits, model metrics, the saved Linear Regression and boosting models, and evaluation plots. It never overwrites the raw CSV except when the networking team deliberately replaces it.
+
+The live controller writes to `data/raw/telemetry_live.csv`, not directly to
+`telemetry_raw.csv`. Review the capture, preserve its provenance, and copy the
+chosen experiment into `telemetry_raw.csv` only when deliberately starting a
+retraining run.
 
 ## Handoff to Ryu
 
@@ -68,12 +76,12 @@ if predicted >= 85:
     reroute_to_alternative_path()
 ```
 
-Use `get_model_info()` to log the active model and metrics. Persistence remains the default until real-data evaluation shows that another model is better, especially at high utilization.
+Use `get_model_info()` to log the active model and metrics. Persistence remains the default until real-data evaluation shows that another model is better, especially at high utilization. Set `SDN_ACTIVE_MODEL=auto` only after that comparison, or name the selected model explicitly.
 
 ## Common issues
 
 - Duplicate `(timestamp, link_id)` rows: Phase B removes duplicates.
-- Missing timestamps: Phase B interpolates gaps within each link.
+- Missing timestamps: preserve and report gaps; exact timestamp matching omits labels without a real t+5 sample.
 - Values outside valid ranges: Phase B clips or fixes supported numeric ranges.
 - No high-load samples: collect traffic that pushes at least one link above 85%.
 - XGBoost worse than Persistence: retain Persistence or tune and validate on richer real data.

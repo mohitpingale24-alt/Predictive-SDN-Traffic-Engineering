@@ -4,16 +4,28 @@ import json
 import os
 from typing import Dict
 import numpy as np
+try:
+	from .portable_gbdt import PortableGBDT
+except ImportError:
+	from portable_gbdt import PortableGBDT
 
-ACTIVE_MODEL = "persistence"
+# Persistence remains the safe live default until telemetry collected from the
+# actual topology has been used for held-out model comparison. Set
+# SDN_ACTIVE_MODEL=auto to select the lowest-RMSE model with a saved artifact.
+ACTIVE_MODEL = os.getenv("SDN_ACTIVE_MODEL", "persistence").strip().lower()
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
 FEATURES_PATH = os.path.join(MODELS_DIR, "feature_list.json")
+LINEAR_MODEL_PATH = os.path.join(MODELS_DIR, "linear_link_predictor.joblib")
 XGB_MODEL_PATH_JSON = os.path.join(MODELS_DIR, "xgb_link_predictor.json")
 XGB_MODEL_PATH_JOBLIB = os.path.join(MODELS_DIR, "xgb_link_predictor.joblib")
 METRICS_PATH = os.path.join(os.path.dirname(__file__), "..", "results", "metrics_comparison.csv")
+CONGESTION_METRICS_PATH = os.path.join(os.path.dirname(__file__), "..", "results", "congestion_metrics.csv")
+MODEL_SELECTION_METRIC = os.getenv("SDN_MODEL_SELECTION_METRIC", "congestion_f1").strip().lower()
 
 _feature_dict = None
+_linear_model = None
 _xgb_model = None
+_resolved_model = None
 
 
 def _load_features():
@@ -24,10 +36,19 @@ def _load_features():
 	return _feature_dict
 
 
-def _load_xgb_model():
+def _load_xgb_model(model_name=None):
 	global _xgb_model
 	if _xgb_model is None:
-		if os.path.exists(XGB_MODEL_PATH_JSON):
+		engine = _load_features().get("engine")
+		use_gbdt = model_name == "gradient_boosting" or (
+			model_name is None and engine == "sklearn_gbdt"
+		)
+		if use_gbdt and os.path.exists(os.path.join(MODELS_DIR, "gbdt_portable.json")):
+			_xgb_model = PortableGBDT(os.path.join(MODELS_DIR, "gbdt_portable.json"), XGB_MODEL_PATH_JOBLIB, _load_features()["features"])
+		elif use_gbdt and os.path.exists(XGB_MODEL_PATH_JOBLIB):
+			import joblib
+			_xgb_model = joblib.load(XGB_MODEL_PATH_JOBLIB)
+		elif os.path.exists(XGB_MODEL_PATH_JSON):
 			import xgboost as xgb
 			_xgb_model = xgb.XGBRegressor()
 			_xgb_model.load_model(XGB_MODEL_PATH_JSON)
@@ -39,6 +60,88 @@ def _load_xgb_model():
 	return _xgb_model
 
 
+def _load_linear_model():
+	global _linear_model
+	if _linear_model is None:
+		if not os.path.exists(LINEAR_MODEL_PATH):
+			raise FileNotFoundError(
+				"No saved Linear Regression model found. Run src/train_baselines.py."
+			)
+		import joblib
+		_linear_model = joblib.load(LINEAR_MODEL_PATH)
+	return _linear_model
+
+
+def _artifact_available(model_name: str) -> bool:
+	if model_name == "persistence":
+		return True
+	if _load_features().get("artifact_status") != "current":
+		return False
+	if model_name == "linear_regression":
+		return os.path.exists(LINEAR_MODEL_PATH)
+	if model_name == "xgboost":
+		return _load_features().get("engine") == "xgboost" and os.path.exists(XGB_MODEL_PATH_JSON)
+	if model_name == "gradient_boosting":
+		return _load_features().get("engine") == "sklearn_gbdt" and os.path.exists(XGB_MODEL_PATH_JOBLIB)
+	return False
+
+
+def _canonical_model_name(metrics_name: str):
+	return {
+		"persistence": "persistence",
+		"linear regression": "linear_regression",
+		"xgboost": "xgboost",
+		"gradient boosting": "gradient_boosting",
+	}.get(str(metrics_name).strip().lower())
+
+
+def resolve_active_model() -> str:
+	"""Resolve an explicit model or select the best available saved model.
+
+	Automatic selection prefers held-out congestion F1 because the controller's
+	decision is threshold-based. Set SDN_MODEL_SELECTION_METRIC=rmse to rank by
+	RMSE then MAE. A model is eligible only when its inference artifact exists.
+	"""
+	global _resolved_model
+	if _resolved_model is not None:
+		return _resolved_model
+
+	valid = {"auto", "persistence", "linear_regression", "xgboost", "gradient_boosting"}
+	if ACTIVE_MODEL not in valid:
+		raise ValueError(f"Unknown model: {ACTIVE_MODEL}. Options: {sorted(valid)}")
+	if ACTIVE_MODEL != "auto":
+		if not _artifact_available(ACTIVE_MODEL):
+			raise FileNotFoundError(
+				f"Required current-schema artifact for {ACTIVE_MODEL} is not available; "
+				"retrain only after the real-data quality gate passes"
+			)
+		_resolved_model = ACTIVE_MODEL
+		return _resolved_model
+
+	if MODEL_SELECTION_METRIC == "congestion_f1" and os.path.exists(CONGESTION_METRICS_PATH):
+		import pandas as pd
+		congestion = pd.read_csv(CONGESTION_METRICS_PATH).sort_values("F1", ascending=False)
+		for metrics_name in congestion["Model"]:
+			candidate = _canonical_model_name(metrics_name)
+			if candidate and _artifact_available(candidate):
+				_resolved_model = candidate
+				return _resolved_model
+
+	if os.path.exists(METRICS_PATH):
+		import pandas as pd
+		metrics = pd.read_csv(METRICS_PATH)
+		if {"Model", "RMSE", "MAE"}.issubset(metrics.columns):
+			metrics = metrics.sort_values(["RMSE", "MAE"], ascending=True)
+			for metrics_name in metrics["Model"]:
+				candidate = _canonical_model_name(metrics_name)
+				if candidate and _artifact_available(candidate):
+					_resolved_model = candidate
+					return _resolved_model
+
+	_resolved_model = "persistence"
+	return _resolved_model
+
+
 def predict_future_utilization(recent_telemetry: Dict) -> float:
 	"""Predict link utilization five seconds into the future."""
 	if not isinstance(recent_telemetry, dict):
@@ -46,7 +149,7 @@ def predict_future_utilization(recent_telemetry: Dict) -> float:
 
 	required_fields = [
 		"timestamp", "link_id", "utilization", "throughput",
-		"delay", "packet_loss", "queue_occupancy", "active_flows",
+		"delay", "packet_loss", "active_flows",
 	]
 	missing = [field for field in required_fields if field not in recent_telemetry]
 	if missing:
@@ -56,35 +159,39 @@ def predict_future_utilization(recent_telemetry: Dict) -> float:
 	if not 0 <= utilization <= 100:
 		raise ValueError(f"utilization must be 0-100%, got {utilization}")
 
-	if ACTIVE_MODEL == "persistence":
+	model_name = resolve_active_model()
+
+	if model_name == "persistence":
 		return utilization
 
-	if ACTIVE_MODEL == "linear_regression":
-		raise NotImplementedError(
-			"Linear Regression is not integrated. Use persistence or xgboost."
-		)
-
-	if ACTIVE_MODEL in ["xgboost", "gradient_boosting"]:
+	if model_name in ["linear_regression", "xgboost", "gradient_boosting"]:
 		feature_cols = _load_features()["features"]
 		missing_features = [
 			feature for feature in feature_cols if feature not in recent_telemetry
 		]
 		if missing_features:
 			raise ValueError(f"Missing model features: {missing_features}")
-		feature_vector = [recent_telemetry[feature] for feature in feature_cols]
-		prediction = _load_xgb_model().predict(np.array([feature_vector]))[0]
+		import pandas as pd
+		feature_vector = pd.DataFrame(
+			[[float(recent_telemetry[feature]) for feature in feature_cols]],
+			columns=feature_cols,
+			dtype=float,
+		)
+		model = _load_linear_model() if model_name == "linear_regression" else _load_xgb_model(model_name)
+		prediction = model.predict(feature_vector)[0]
 		return float(np.clip(prediction, 0, 100))
 
-	raise ValueError(
-		f"Unknown model: {ACTIVE_MODEL}. Options: persistence, linear_regression, xgboost"
-	)
+	raise AssertionError(f"Unhandled resolved model: {model_name}")
 
 
 def get_model_info() -> Dict:
 	"""Return metadata about the active model for controller logging."""
 	feature_dict = _load_features()
+	model_name = resolve_active_model()
 	model_info = {
-		"active_model": ACTIVE_MODEL,
+		"configured_model": ACTIVE_MODEL,
+		"active_model": model_name,
+		"model_selection_metric": MODEL_SELECTION_METRIC,
 		"model_mae": None,
 		"model_rmse": None,
 		"model_r2": None,
@@ -97,7 +204,8 @@ def get_model_info() -> Dict:
 		import pandas as pd
 
 		metrics = pd.read_csv(METRICS_PATH)
-		row = metrics[metrics["Model"].str.lower() == ACTIVE_MODEL]
+		canonical = metrics["Model"].map(_canonical_model_name)
+		row = metrics[canonical == model_name]
 		if not row.empty:
 			model_info.update({
 				"model_mae": float(row.iloc[0]["MAE"]),
@@ -117,10 +225,13 @@ if __name__ == "__main__":
 		"throughput": 2.0,
 		"delay": 3.5,
 		"packet_loss": 0.0,
-		"queue_occupancy": 5.0,
 		"active_flows": 3,
 	}
-	print(f"Active model: {ACTIVE_MODEL}")
+	for feature in _load_features()["features"]:
+		if feature.startswith("util_lag_") or feature.startswith("util_ma_"):
+			telemetry.setdefault(feature, telemetry["utilization"])
+	telemetry.setdefault("util_slope", 0.0)
+	print(f"Configured model: {ACTIVE_MODEL}")
 	print(f"Model info: {get_model_info()}")
 	print(f"20.0% utilization -> {predict_future_utilization(telemetry):.2f}% prediction")
 

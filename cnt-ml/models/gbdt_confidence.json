@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "method": "validation_absolute_residual_exploratory",
+  "features": [
+    "utilization",
+    "throughput",
+    "delay",
+    "packet_loss",
+    "active_flows",
+    "util_lag_1",
+    "util_lag_2",
+    "util_lag_3",
+    "util_lag_5",
+    "util_lag_10",
+    "util_ma_5s",
+    "util_ma_10s",
+    "util_slope"
+  ],
+  "domain_features": [
+    "utilization",
+    "throughput",
+    "delay",
+    "util_lag_1",
+    "util_lag_2",
+    "util_lag_3",
+    "util_lag_10",
+    "util_ma_5s",
+    "util_ma_10s",
+    "util_slope"
+  ],
+  "ignored_unused_features": [
+    "packet_loss",
+    "active_flows",
+    "util_lag_5"
+  ],
+  "target": "target_util",
+  "horizon_seconds": 5,
+  "nominal_coverage": 0.9,
+  "radius_percentage_points": 25.172974455995735,
+  "quantile_rank": 185,
+  "rank_convention": "ceil((n+1)*nominal_coverage), 1-based, no interpolation",
+  "prediction_clipping": [
+    0.0,
+    100.0
+  ],
+  "interval_clipping": [
+    0.0,
+    100.0
+  ],
+  "train_rows": 988,
+  "calibration_rows": 204,
+  "calibration_unique_timestamps": 102,
+  "training_time_range": [
+    16.0,
+    515.0
+  ],
+  "training_target_max_timestamp": 520.0,
+  "calibration_time_range": [
+    521.0,
+    624.0
+  ],
+  "training_feature_ranges": {
+    "utilization": {
+      "min": 0.0,
+      "max": 92.868
+    },
+    "throughput": {
+      "min": 0.0,
+      "max": 14.087
+    },
+    "delay": {
+      "min": 10.2,
+      "max": 52.6
+    },
+    "util_lag_1": {
+      "min": 0.0,
+      "max": 92.868
+    },
+    "util_lag_2": {
+      "min": 0.0,
+      "max": 92.868
+    },
+    "util_lag_3": {
+      "min": 0.0,
+      "max": 92.868
+    },
+    "util_lag_10": {
+      "min": 0.0,
+      "max": 92.868
+    },
+    "util_ma_5s": {
+      "min": 0.0,
+      "max": 83.5422
+    },
+    "util_ma_10s": {
+      "min": 0.0,
+      "max": 77.7911
+    },
+    "util_slope": {
+      "min": -90.998,
+      "max": 49.942
+    }
+  },
+  "empirical_validation_coverage": 0.9068627450980392,
+  "validation_in_domain_rows": 199,
+  "validation_point_predictions_at_or_above_85": 4,
+  "validation_interval_gate_passes_at_85": 0,
+  "validation_positive_targets_at_85": 3,
+  "validation_reused_for_model_selection": true,
+  "independent_calibration_available": false,
+  "exploratory": true,
+  "coverage_guarantee": false,
+  "test_labels_used": false,
+  "model_refit": false,
+  "diagnostic_only": {
+    "one_sided_overprediction_radius_percentage_points": 9.503345197379627,
+    "one_sided_quantile_rank": 185,
+    "used_for_routing": false
+  },
+  "limitations": [
+    "Validation also selected model hyperparameters; this is exploratory residual calibration.",
+    "Adjacent timestamps and simultaneous link observations are dependent.",
+    "Nominal coverage is a setting, not a congestion probability or coverage guarantee.",
+    "Coverage may shift with workload, RTT, topology, capacity, or telemetry semantics.",
+    "Training feature ranges are a necessary support check, not proof of distributional similarity.",
+    "No independent calibration or held-out evaluation of the interval has been performed."
+  ],
+  "routing_gate": {
+    "threshold_percent": 85.0,
+    "rule": "in_domain and interval_lower >= congestion_threshold",
+    "maximum_possible_lower_bound_percent": 74.82702554400427,
+    "proactive_gate_can_pass_at_85": false,
+    "measured_reactive_fallback_required": true
+  },
+  "bindings": {
+    "portable_model": {
+      "path": "cnt-ml/models/gbdt_portable.json",
+      "sha256": "ff62cfefde45b200b90d3c8ce5a52c764260804a2f3e36b6323978cc3c71a57d"
+    },
+    "source_model": {
+      "path": "cnt-ml/models/xgb_link_predictor.joblib",
+      "sha256": "83d66a75bc967f5de23e48e722157d3e8c2c724cb60ccef9a3ea8eb16a0c5711"
+    },
+    "feature_schema": {
+      "path": "cnt-ml/models/feature_list.json",
+      "sha256": "e4f225fc32efea36621c3830bc57e441b782e3935bb7aae19dfff8f16120ceb1"
+    },
+    "train_split": {
+      "path": "cnt-ml/data/real/calibration-02/prepared/train.csv",
+      "sha256": "434124bbe40cf2a9ed1ed89bfbd2c4196d1ceeb0017f032b6ba9c0f48ce133ea"
+    },
+    "val_split": {
+      "path": "cnt-ml/data/real/calibration-02/prepared/val.csv",
+      "sha256": "01995ad13c20938dda6bc9436820ac192f9ce9dd00af4886718e33c1900be33f"
+    },
+    "test_split": {
+      "path": "cnt-ml/data/real/calibration-02/prepared/test.csv",
+      "sha256": "71c64ca34f0683eec65d8033bff02c6c2f710644b2ae22feabae3394d728aea2"
+    }
+  }
+}

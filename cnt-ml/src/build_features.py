@@ -5,7 +5,18 @@ import os
 INPUT_PATH = "data/processed/telemetry_clean.csv"
 OUTPUT_PATH = "data/processed/telemetry_features.csv"
 
-HORIZON = 5   # predict 5 seconds ahead (since sampling is 1 second, this = 5 rows)
+HORIZON_SECONDS = 5
+
+
+def attach_timestamp_target(group, horizon_seconds=HORIZON_SECONDS):
+	"""Attach an exact t+horizon target without assuming fixed row spacing."""
+	group = group.sort_values("timestamp").reset_index(drop=True).copy()
+	future = group[["timestamp", "utilization"]].rename(columns={
+		"timestamp": "target_timestamp",
+		"utilization": "target_util",
+	})
+	group["target_timestamp"] = group["timestamp"] + horizon_seconds
+	return group.merge(future, on="target_timestamp", how="left", validate="many_to_one")
 
 def main():
 	df = pd.read_csv(INPUT_PATH)
@@ -14,10 +25,8 @@ def main():
 	processed_links = []
 
 	for link_id, group in df.groupby("link_id"):
-		group = group.sort_values("timestamp").reset_index(drop=True)
-
 		# PHASE C — Prediction target
-		group["target_util"] = group["utilization"].shift(-HORIZON)
+		group = attach_timestamp_target(group)
 
 		# PHASE D — Feature engineering
 		for lag in [1, 2, 3, 5, 10]:

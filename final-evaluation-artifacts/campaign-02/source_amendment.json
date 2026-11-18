@@ -1,0 +1,8 @@
+{
+  "file": "path_switch_controller.py",
+  "before_sha256": "5c188b217be411ad1f96f3aa7a3816d33e8c6353bb61080e72524b5858db807e",
+  "after_sha256": "3e3ab24d57f63a41d516389facf2ea9ed27ad17f2255e0a0b0e26942d1298377",
+  "reason": "Supply empty signal, prediction and timing fields in missing-RTT skip records. No model, feature, threshold, routing policy, topology or workload change.",
+  "affected_runs": "predictive-ml/run-03 through run-08",
+  "excluded": "excluded/predictive-ml-run-03"
+}

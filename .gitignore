@@ -1,4 +1,11 @@
 __pycache__/
 *.pyc
+.DS_Store
+.venv-ml/
+work/final-evaluation-vm/
+work/final-packaging/node_modules/
+work/final-packaging/rendered/
+work/final-packaging/docx-render/
 telemetry_controller.py
 telemetry.csv
+live-experiments/

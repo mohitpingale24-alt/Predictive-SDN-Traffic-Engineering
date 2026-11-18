@@ -1,0 +1,2 @@
+timestamp,event,control_mode,old_path,new_path,signal_a,signal_b,reason
+1789130327.9366925,controller_start,static,,A,,,development default uses persistence unless SDN_ACTIVE_MODEL is set

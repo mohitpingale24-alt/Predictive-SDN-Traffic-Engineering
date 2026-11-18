@@ -1,0 +1,35 @@
+#cloud-config
+write_files:
+  - path: /usr/local/sbin/run-sdn-final-campaign
+    owner: root:root
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      mkdir -p /mnt/repo
+      mountpoint -q /mnt/repo || mount -t 9p -o trans=virtio,version=9p2000.L repo /mnt/repo
+      mkdir -p /mnt/repo/final-evaluation-artifacts
+      exec > >(tee /mnt/repo/final-evaluation-artifacts/campaign-vm.log) 2>&1
+      trap 'rc=$?; if [ -d /tmp/sdn-final-campaign ]; then mkdir -p /mnt/repo/final-evaluation-artifacts/campaign-01.failed; cp -R /tmp/sdn-final-campaign/. /mnt/repo/final-evaluation-artifacts/campaign-01.failed/; fi; echo "FAIL rc=$rc $(date --iso-8601=seconds)" > /mnt/repo/final-evaluation-artifacts/campaign-status.txt; sync; poweroff' ERR
+      echo "RUNNING environment-check $(date --iso-8601=seconds)" > /mnt/repo/final-evaluation-artifacts/campaign-status.txt
+      systemctl start openvswitch-switch
+      export PATH="/home/mohit/sdn-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      export PYTHONDONTWRITEBYTECODE=1
+      if ! /home/mohit/sdn-venv/bin/python -c "import mininet"; then
+        /home/mohit/sdn-venv/bin/python -m pip install /mnt/repo/work/final-evaluation-vm/mininet-2.3.0.tar.gz
+      fi
+      sha256sum /mnt/repo/work/final-evaluation-vm/mininet-2.3.0.tar.gz > /mnt/repo/final-evaluation-artifacts/mininet-source.sha256
+      ryu-manager --version
+      cd /mnt/repo
+      SDN_ACTIVE_MODEL=gradient_boosting /home/mohit/sdn-venv/bin/python -c "import sys; sys.path.insert(0, 'cnt-ml'); from src.predict import get_model_info; info=get_model_info(); assert info['active_model']=='gradient_boosting'; print(info)"
+      mn -c
+      echo "RUNNING campaign $(date --iso-8601=seconds)" > /mnt/repo/final-evaluation-artifacts/campaign-status.txt
+      ./experiments/run_suite.sh /tmp/sdn-final-campaign 8
+      mkdir /mnt/repo/final-evaluation-artifacts/campaign-01
+      cp -R /tmp/sdn-final-campaign/. /mnt/repo/final-evaluation-artifacts/campaign-01/
+      echo "COMPLETE $(date --iso-8601=seconds)" > /mnt/repo/final-evaluation-artifacts/campaign-status.txt
+      sync
+      poweroff
+runcmd:
+  - [bash, -lc, '/usr/local/sbin/run-sdn-final-campaign']
+final_message: "SDN final evaluation campaign finished"

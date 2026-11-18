@@ -1,0 +1,4 @@
+timestamp,event,control_mode,old_path,new_path,signal_a,signal_b,reason
+1789130758.1761966,controller_start,reactive,,A,,,development default uses persistence unless SDN_ACTIVE_MODEL is set
+1789130803.2900214,reroute,reactive,A,B,92.669,46.3345,reactive projected policy A=92.67% B=46.33%
+1789130843.364292,reroute,reactive,B,A,51.408,25.704,reactive projected policy A=51.41% B=25.70%

@@ -3,6 +3,7 @@ import time
 
 import numpy as np
 import pandas as pd
+import joblib
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
@@ -10,6 +11,8 @@ TRAIN_PATH = "data/splits/train.csv"
 VAL_PATH = "data/splits/val.csv"
 TEST_PATH = "data/splits/test.csv"
 OUTPUT_PATH = "results/metrics_comparison.csv"
+LINEAR_MODEL_PATH = "models/linear_link_predictor.joblib"
+FEATURES_PATH = "models/feature_list.json"
 TARGET = "target_util"
 
 FEATURES = [
@@ -17,7 +20,6 @@ FEATURES = [
 	"throughput",
 	"delay",
 	"packet_loss",
-	"queue_occupancy",
 	"active_flows",
 	"util_lag_1",
 	"util_lag_2",
@@ -92,6 +94,8 @@ def main():
 	linear_model = LinearRegression()
 	linear_model.fit(x_train, y_train)
 	print("  Linear Regression trained")
+	os.makedirs("models", exist_ok=True)
+	joblib.dump(linear_model, LINEAR_MODEL_PATH)
 	start = time.perf_counter()
 	linear_predictions = linear_model.predict(x_test)
 	linear_elapsed = time.perf_counter() - start
@@ -112,6 +116,13 @@ def main():
 	])
 	os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
 	comparison.to_csv(OUTPUT_PATH, index=False)
+	import json
+	with open(FEATURES_PATH, "w", encoding="utf-8") as handle:
+		json.dump({
+			"features": FEATURES,
+			"target": TARGET,
+			"horizon_seconds": 5,
+		}, handle, indent=2)
 
 	print("\n" + "=" * 70)
 	print("BASELINE COMPARISON")
@@ -124,6 +135,7 @@ def main():
 		print(f"\n  Persistence beats Linear Regression by {-improvement:.4f}% MAE")
 	print(f"\n  XGBoost target: beat MAE of {min(persistence_metrics['MAE'], linear_metrics['MAE']):.4f}%")
 	print(f"\nSaved baseline metrics -> {OUTPUT_PATH}")
+	print(f"Saved Linear Regression model -> {LINEAR_MODEL_PATH}")
 
 
 if __name__ == "__main__":

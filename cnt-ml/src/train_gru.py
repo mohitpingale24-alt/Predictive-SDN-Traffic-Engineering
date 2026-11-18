@@ -19,13 +19,14 @@ DATA_DIR = "data/splits"
 MODELS_DIR = "models"
 RESULTS_DIR = "results"
 METRICS_CSV = os.path.join(RESULTS_DIR, "metrics_comparison.csv")
+CONGESTION_METRICS_CSV = os.path.join(RESULTS_DIR, "congestion_metrics.csv")
+CONGESTION_THRESHOLD = 85.0
 
 SEQUENCE_FEATURES = [
 	"utilization",
 	"throughput",
 	"delay",
 	"packet_loss",
-	"queue_occupancy",
 ]
 OPTIONAL_FEATURES = ["active_flows"]
 LINK_ID_COL = "link_id"
@@ -51,16 +52,34 @@ def resolve_feature_cols(df):
 	return feature_cols
 
 
-def build_windows(df, feature_cols, window_size):
+def build_windows(df, feature_cols, window_size, history_df=None):
+	"""Build windows ending at each labelled observation.
+
+	For validation/test, history_df supplies preceding observations so every row
+	of the evaluated split can be scored without borrowing future information.
+	"""
 	windows = []
 	targets = []
 	for _, group in df.groupby(LINK_ID_COL, sort=False):
 		group = group.sort_values(TIMESTAMP_COL).reset_index(drop=True)
-		features = group[feature_cols].to_numpy(dtype=np.float32)
+		context = pd.DataFrame(columns=group.columns)
+		if history_df is not None:
+			link_id = group[LINK_ID_COL].iloc[0]
+			context = (
+				history_df[history_df[LINK_ID_COL] == link_id]
+				.sort_values(TIMESTAMP_COL)
+				.tail(window_size - 1)
+			)
+		combined_features = pd.concat([context, group], ignore_index=True)[feature_cols].to_numpy(dtype=np.float32)
 		target = group[TARGET_COL].to_numpy(dtype=np.float32)
-		for index in range(window_size, len(group)):
-			windows.append(features[index - window_size:index])
-			targets.append(target[index])
+		context_length = len(context)
+		for row_index in range(len(group)):
+			combined_index = context_length + row_index
+			start = combined_index - window_size + 1
+			if start < 0:
+				continue
+			windows.append(combined_features[start:combined_index + 1])
+			targets.append(target[row_index])
 	return np.asarray(windows, dtype=np.float32), np.asarray(targets, dtype=np.float32)
 
 
@@ -98,7 +117,7 @@ def evaluate(model, x_test, y_test):
 		"rmse": mean_squared_error(y_test, predictions) ** 0.5,
 		"r2": r2_score(y_test, predictions),
 		"inference_time_ms": inference_ms,
-	}
+	}, predictions
 
 
 def update_metrics_csv(metrics):
@@ -114,6 +133,34 @@ def update_metrics_csv(metrics):
 	if not existing.empty and "Model" in existing.columns:
 		existing = existing[existing["Model"].str.lower() != "gru"]
 	pd.concat([existing, pd.DataFrame([row])], ignore_index=True).to_csv(METRICS_CSV, index=False)
+
+
+def update_congestion_metrics_csv(y_true, predictions):
+	actual = y_true >= CONGESTION_THRESHOLD
+	predicted = predictions >= CONGESTION_THRESHOLD
+	tp = int((actual & predicted).sum())
+	fp = int((~actual & predicted).sum())
+	fn = int((actual & ~predicted).sum())
+	tn = int((~actual & ~predicted).sum())
+	precision = tp / (tp + fp) if tp + fp else np.nan
+	recall = tp / (tp + fn) if tp + fn else np.nan
+	f1 = 2 * precision * recall / (precision + recall) if precision + recall else np.nan
+	row = {
+		"Model": "GRU",
+		"Threshold": CONGESTION_THRESHOLD,
+		"TP": tp,
+		"FP": fp,
+		"FN": fn,
+		"TN": tn,
+		"Precision": precision,
+		"Recall": recall,
+		"F1": f1,
+	}
+	existing = pd.read_csv(CONGESTION_METRICS_CSV) if os.path.exists(CONGESTION_METRICS_CSV) else pd.DataFrame()
+	if not existing.empty and "Model" in existing.columns:
+		existing = existing[existing["Model"].str.lower() != "gru"]
+	pd.concat([existing, pd.DataFrame([row])], ignore_index=True).to_csv(CONGESTION_METRICS_CSV, index=False)
+	return row
 
 
 def main():
@@ -138,8 +185,8 @@ def main():
 
 	print("\n[2] Building sliding windows (per-link, chronological, no leakage)...")
 	x_train, y_train = build_windows(train_df, feature_cols, WINDOW_SIZE)
-	x_val, y_val = build_windows(val_df, feature_cols, WINDOW_SIZE)
-	x_test, y_test = build_windows(test_df, feature_cols, WINDOW_SIZE)
+	x_val, y_val = build_windows(val_df, feature_cols, WINDOW_SIZE, history_df=train_df)
+	x_test, y_test = build_windows(test_df, feature_cols, WINDOW_SIZE, history_df=val_df)
 	print(f"    Train windows: {x_train.shape}")
 	print(f"    Val windows:   {x_val.shape}")
 	print(f"    Test windows:  {x_test.shape}")
@@ -165,11 +212,16 @@ def main():
 	)
 
 	print("\n[4] Evaluating on test set...")
-	metrics = evaluate(model, x_test, y_test)
+	metrics, predictions = evaluate(model, x_test, y_test)
 	print(f"    MAE:  {metrics['mae']:.4f}%")
 	print(f"    RMSE: {metrics['rmse']:.4f}%")
 	print(f"    R2:   {metrics['r2']:.4f}")
 	print(f"    Inference time: {metrics['inference_time_ms']:.4f} ms/sample")
+	congestion = update_congestion_metrics_csv(y_test, predictions)
+	print(
+		f"    Congestion precision: {congestion['Precision']:.4f}; "
+		f"recall: {congestion['Recall']:.4f}; F1: {congestion['F1']:.4f}"
+	)
 
 	os.makedirs(MODELS_DIR, exist_ok=True)
 	model.save(os.path.join(MODELS_DIR, "gru_link_predictor.h5"))
@@ -179,6 +231,8 @@ def main():
 		"feature_mean": feature_mean.tolist(),
 		"feature_std": feature_std.tolist(),
 		"target_col": TARGET_COL,
+		"target_alignment": "exact_timestamp",
+		"artifact_status": "current",
 		"model_mae": round(metrics["mae"], 4),
 		"model_rmse": round(metrics["rmse"], 4),
 		"model_r2": round(metrics["r2"], 4),
@@ -191,6 +245,7 @@ def main():
 	print("\nSaved models/gru_link_predictor.h5")
 	print("Saved models/gru_config.json")
 	print("Updated results/metrics_comparison.csv")
+	print("Updated results/congestion_metrics.csv")
 	print("\nPHASE K COMPLETE")
 
 

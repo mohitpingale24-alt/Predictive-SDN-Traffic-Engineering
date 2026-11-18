@@ -1,0 +1,129 @@
+{
+  "expected_interval_seconds": 1.0,
+  "link_interval_counts": {
+    "S1-S2": {
+      "1.0": 732,
+      "2.0": 7
+    },
+    "S1-S3": {
+      "1.0": 732,
+      "2.0": 7
+    }
+  },
+  "unique_gap_count": 7,
+  "gaps": [
+    {
+      "previous_timestamp": 1788428076.0,
+      "current_timestamp": 1788428078.0,
+      "expected_interval_seconds": 1.0,
+      "actual_interval_seconds": 2.0,
+      "missing_duration_seconds": 1.0,
+      "links": [
+        "S1-S2",
+        "S1-S3"
+      ],
+      "workload_segment": "warmup",
+      "iperf_file": "iperf_r01_01_warmup.json",
+      "nearby_control_events": []
+    },
+    {
+      "previous_timestamp": 1788428238.0,
+      "current_timestamp": 1788428240.0,
+      "expected_interval_seconds": 1.0,
+      "actual_interval_seconds": 2.0,
+      "missing_duration_seconds": 1.0,
+      "links": [
+        "S1-S2",
+        "S1-S3"
+      ],
+      "workload_segment": "recovery",
+      "iperf_file": "iperf_r02_05_recovery.json",
+      "nearby_control_events": []
+    },
+    {
+      "previous_timestamp": 1788428382.0,
+      "current_timestamp": 1788428384.0,
+      "expected_interval_seconds": 1.0,
+      "actual_interval_seconds": 2.0,
+      "missing_duration_seconds": 1.0,
+      "links": [
+        "S1-S2",
+        "S1-S3"
+      ],
+      "workload_segment": "near_threshold",
+      "iperf_file": "iperf_r04_03_near_threshold.json",
+      "nearby_control_events": []
+    },
+    {
+      "previous_timestamp": 1788428510.0,
+      "current_timestamp": 1788428512.0,
+      "expected_interval_seconds": 1.0,
+      "actual_interval_seconds": 2.0,
+      "missing_duration_seconds": 1.0,
+      "links": [
+        "S1-S2",
+        "S1-S3"
+      ],
+      "workload_segment": "recovery",
+      "iperf_file": "iperf_r05_05_recovery.json",
+      "nearby_control_events": [
+        {
+          "timestamp": 1788428512.015089,
+          "event": "reroute",
+          "old_path": "B",
+          "new_path": "A"
+        }
+      ]
+    },
+    {
+      "previous_timestamp": 1788428602.0,
+      "current_timestamp": 1788428604.0,
+      "expected_interval_seconds": 1.0,
+      "actual_interval_seconds": 2.0,
+      "missing_duration_seconds": 1.0,
+      "links": [
+        "S1-S2",
+        "S1-S3"
+      ],
+      "workload_segment": "recovery",
+      "iperf_file": "iperf_r06_05_recovery.json",
+      "nearby_control_events": [
+        {
+          "timestamp": 1788428603.0101776,
+          "event": "reroute",
+          "old_path": "B",
+          "new_path": "A"
+        }
+      ]
+    },
+    {
+      "previous_timestamp": 1788428701.0,
+      "current_timestamp": 1788428703.0,
+      "expected_interval_seconds": 1.0,
+      "actual_interval_seconds": 2.0,
+      "missing_duration_seconds": 1.0,
+      "links": [
+        "S1-S2",
+        "S1-S3"
+      ],
+      "workload_segment": "recovery",
+      "iperf_file": "iperf_r07_05_recovery.json",
+      "nearby_control_events": []
+    },
+    {
+      "previous_timestamp": 1788428799.0,
+      "current_timestamp": 1788428801.0,
+      "expected_interval_seconds": 1.0,
+      "actual_interval_seconds": 2.0,
+      "missing_duration_seconds": 1.0,
+      "links": [
+        "S1-S2",
+        "S1-S3"
+      ],
+      "workload_segment": "recovery",
+      "iperf_file": "iperf_r08_05_recovery.json",
+      "nearby_control_events": []
+    }
+  ],
+  "handling_policy": "Preserve observed timestamps. Do not interpolate. Future t+5 targets must be joined by timestamp, never by row offset."
+}

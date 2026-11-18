@@ -1,0 +1,28 @@
+{
+  "status": "selected_for_evaluated_workload",
+  "selected_model": "gradient_boosting",
+  "controller_system": "predictive-ml",
+  "objective": "Avoid sampled active-link congestion at the 85 percent threshold",
+  "repetitions_per_system": 8,
+  "verified_runs": 32,
+  "evidence": "final-analysis/evidence.json",
+  "model_artifact": "cnt-ml/models/gbdt_portable.json",
+  "source_joblib_sha256": "83d66a75bc967f5de23e48e722157d3e8c2c724cb60ccef9a3ea8eb16a0c5711",
+  "finding": "Gradient Boosting recorded zero congestion seconds in all eight sessions; Reactive and Persistence each recorded three seconds in every session. Static averaged 38.625 seconds.",
+  "tradeoff": "Reactive had lower mean P95 RTT and packet loss. Paired 95 percent intervals for GB minus Reactive P95 RTT, goodput and loss include zero. No superiority on those metrics is established.",
+  "offline_comparison": "GRU remains the best regression forecaster on the frozen test split. GRU was not evaluated as a routing controller.",
+  "limitations": [
+    "One diamond topology, one host pair, a deterministic five-stage workload and fixed system order; not a general production-network result.",
+    "Eight repetitions improve repeatability evidence, but do not supply diverse congestion scenarios. Only three congestion-positive observations exist in the offline test split.",
+    "Congestion is observed at approximately one-second sampling resolution. Zero sampled congestion does not prove zero sub-second congestion.",
+    "Episode avoidance and successful relief use time-aligned Static references, not causal counterfactual measurements.",
+    "Identical congestion values produce zero-width t intervals; this does not imply certainty on unseen networks. Unbounded t intervals for small nonnegative metrics can cross zero.",
+    "Training used nearest covered RTT while live inference used causal recent RTT. Packet-loss and active-flow feature semantics require review before another model uses them; this frozen ensemble has no splits on those features."
+  ],
+  "provenance": {
+    "excluded_campaign": "campaign-01",
+    "excluded_failed_repetition": "excluded/predictive-ml-run-03",
+    "logging_only_amendment": "source_amendment.json",
+    "preserved_runtime_source": "runtime-source.tar.gz"
+  }
+}

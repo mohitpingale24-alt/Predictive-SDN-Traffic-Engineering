@@ -13,7 +13,6 @@ REQUIRED_COLUMNS = [
     "throughput",
     "delay",
     "packet_loss",
-    "queue_occupancy",
     "active_flows",
 ]
 NUMERIC_COLUMNS = [
@@ -22,32 +21,34 @@ NUMERIC_COLUMNS = [
     "throughput",
     "delay",
     "packet_loss",
-    "queue_occupancy",
     "active_flows",
 ]
 
 
-def main():
+def main(input_path=INPUT_PATH):
     print("=" * 70)
     print("PHASE J - REAL TELEMETRY SCHEMA VALIDATION")
     print("=" * 70)
 
-    if not os.path.exists(INPUT_PATH):
-        print(f"FAIL: input file does not exist: {INPUT_PATH}")
+    if not os.path.exists(input_path):
+        print(f"FAIL: input file does not exist: {input_path}")
         return 1
 
     try:
-        df = pd.read_csv(INPUT_PATH)
+        df = pd.read_csv(input_path)
     except Exception as error:
-        print(f"FAIL: could not read {INPUT_PATH}: {error}")
+        print(f"FAIL: could not read {input_path}: {error}")
         return 1
 
-    print(f"Loaded {len(df):,} rows from {INPUT_PATH}")
+    print(f"Loaded {len(df):,} rows from {input_path}")
+    if "queue_occupancy" in df.columns:
+        print("FAIL: queue_occupancy is deprecated because no real queue measurement is available")
+        return 1
     missing = [column for column in REQUIRED_COLUMNS if column not in df.columns]
     if missing:
         print(f"FAIL: missing required columns: {missing}")
         return 1
-    print("PASS: all 8 required columns are present")
+    print(f"PASS: all {len(REQUIRED_COLUMNS)} required columns are present")
 
     if df.empty:
         print("FAIL: dataset is empty")
@@ -70,7 +71,6 @@ def main():
     range_checks = {
         "utilization": (0, 100),
         "packet_loss": (0, 100),
-        "queue_occupancy": (0, 100),
         "throughput": (0, np.inf),
         "delay": (0, np.inf),
         "active_flows": (0, np.inf),
@@ -124,4 +124,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else INPUT_PATH))

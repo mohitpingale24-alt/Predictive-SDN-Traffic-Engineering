@@ -1,0 +1,13 @@
+numpy
+pandas
+scikit-learn
+joblib
+eventlet==0.30.2
+ryu==4.34
+
+# Mininet and Open vSwitch are system packages and should be installed in the
+# Linux environment used for network emulation, not from this file. Ubuntu 20.04
+# installs the Mininet 2.2.2 module for Python 2 only; the final experiment VM
+# additionally installs the official Mininet 2.3.0 source package into its
+# Python 3 controller environment. The Ryu import path was verified with Python
+# 3.8/3.9; current Python 3.12 packaging fails.

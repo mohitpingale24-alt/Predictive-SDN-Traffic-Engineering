@@ -12,6 +12,7 @@ import joblib
 TEST_PATH = "data/splits/test.csv"
 TRAIN_PATH = "data/splits/train.csv"
 RESULTS_PATH = "results/metrics_comparison.csv"
+CONGESTION_RESULTS_PATH = "results/congestion_metrics.csv"
 MODEL_PATH_XGB = "models/xgb_link_predictor.json"
 MODEL_PATH_GBDT = "models/xgb_link_predictor.joblib"
 FEATURES_PATH = "models/feature_list.json"
@@ -24,8 +25,11 @@ def ensure_plots_dir():
 
 def compute_error_by_load(y_true, y_pred, utilization, bin_edges=(0, 30, 60, 85, 100)):
 	results = []
-	for lower, upper in zip(bin_edges[:-1], bin_edges[1:]):
-		mask = (utilization >= lower) & (utilization < upper)
+	for index, (lower, upper) in enumerate(zip(bin_edges[:-1], bin_edges[1:])):
+		if index == len(bin_edges) - 2:
+			mask = (utilization >= lower) & (utilization <= upper)
+		else:
+			mask = (utilization >= lower) & (utilization < upper)
 		if mask.sum() == 0:
 			continue
 		results.append({
@@ -44,6 +48,28 @@ def metrics_for_predictions(y_true, predictions, inference_ms):
 		"RMSE": mean_squared_error(y_true, predictions) ** 0.5,
 		"R2": r2_score(y_true, predictions),
 		"Inference_Time_ms": inference_ms,
+	}
+
+
+def congestion_metrics(y_true, predictions, threshold=85.0):
+	actual = y_true >= threshold
+	predicted = predictions >= threshold
+	tp = int((actual & predicted).sum())
+	fp = int((~actual & predicted).sum())
+	fn = int((actual & ~predicted).sum())
+	tn = int((~actual & ~predicted).sum())
+	precision = tp / (tp + fp) if tp + fp else np.nan
+	recall = tp / (tp + fn) if tp + fn else np.nan
+	f1 = 2 * precision * recall / (precision + recall) if precision + recall else np.nan
+	return {
+		"Threshold": threshold,
+		"TP": tp,
+		"FP": fp,
+		"FN": fn,
+		"TN": tn,
+		"Precision": precision,
+		"Recall": recall,
+		"F1": f1,
 	}
 
 
@@ -155,9 +181,10 @@ def main():
 	predictions["Linear Regression"] = linear_model.predict(x_test)
 	inference["Linear Regression"] = (time.perf_counter() - start) * 1000 / len(test)
 
-	gbdt_label = "XGBoost"
+	gbdt_label = "Gradient Boosting"
 	model = None
-	if os.path.exists(MODEL_PATH_XGB):
+	engine = feature_dict.get("engine", "sklearn_gbdt")
+	if engine == "xgboost" and os.path.exists(MODEL_PATH_XGB):
 		try:
 			import xgboost as xgb
 			model = xgb.XGBRegressor()
@@ -165,9 +192,8 @@ def main():
 		except Exception:
 			model = None
 
-	if model is None and os.path.exists(MODEL_PATH_GBDT):
+	if engine == "sklearn_gbdt" and os.path.exists(MODEL_PATH_GBDT):
 		model = joblib.load(MODEL_PATH_GBDT)
-		gbdt_label = "Gradient Boosting"
 
 	if model is None:
 		raise FileNotFoundError("No trained XGBoost/GBDT model found in models/")
@@ -181,23 +207,32 @@ def main():
 	for label, prediction in predictions.items():
 		result = metrics_for_predictions(y_test, prediction, inference[label])
 		overall.append({"Model": label, **result})
-		load_tables[label] = compute_error_by_load(y_test, prediction, current_util)
+		load_tables[label] = compute_error_by_load(y_test, prediction, y_test)
 		print(f"\n{label}: MAE {result['MAE']:.4f}% | RMSE {result['RMSE']:.4f}% | R2 {result['R2']:.4f}")
 
 	print("\nERROR ANALYSIS BY LOAD LEVEL")
 	for label, table in load_tables.items():
 		print(f"\n{label}:\n{table.to_string(index=False)}")
 
-	high_load = current_util >= 85
-	print(f"\nCRITICAL: High-Load Performance (utilization >= 85%)")
+	high_load = y_test >= 85
+	print(f"\nCRITICAL: Future High-Load Performance (target utilization >= 85%)")
 	print(f"{high_load.sum()} samples at high load")
+	congestion_rows = []
 	for label, prediction in predictions.items():
 		if high_load.sum():
 			print(f"  {label:<20} MAE at high load: {mean_absolute_error(y_test[high_load], prediction[high_load]):.4f}%")
+		classification = congestion_metrics(y_test, prediction)
+		congestion_rows.append({"Model": label, **classification})
+		print(
+			f"  {label:<20} congestion precision={classification['Precision']:.4f} "
+			f"recall={classification['Recall']:.4f} F1={classification['F1']:.4f}"
+		)
 
 	save_plots(y_test, predictions, load_tables)
 	pd.DataFrame(overall).to_csv(RESULTS_PATH, index=False)
+	pd.DataFrame(congestion_rows).to_csv(CONGESTION_RESULTS_PATH, index=False)
 	print(f"\nSaved metrics -> {RESULTS_PATH}")
+	print(f"Saved congestion metrics -> {CONGESTION_RESULTS_PATH}")
 	print(f"Generated plots -> {PLOTS_DIR}")
 	print("\nPHASE H COMPLETE")
 

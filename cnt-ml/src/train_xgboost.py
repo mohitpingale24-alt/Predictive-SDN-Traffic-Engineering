@@ -1,19 +1,25 @@
 import json
 import os
 import time
+import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 XGBOOST_AVAILABLE = False
-try:
-	from xgboost import XGBRegressor
-	# Test if C API / DLL loads successfully without AppLocker error
-	_test_model = XGBRegressor(n_estimators=1)
-	_test_model.fit([[0]], [0])
-	XGBOOST_AVAILABLE = True
-except Exception:
-	from sklearn.ensemble import GradientBoostingRegressor
-	XGBOOST_AVAILABLE = False
+XGBOOST_LOAD_ERROR = None
+BOOSTING_ENGINE = os.getenv("SDN_BOOSTING_ENGINE", "sklearn_gbdt").strip().lower()
+from sklearn.ensemble import GradientBoostingRegressor
+if BOOSTING_ENGINE == "native_xgboost":
+	try:
+		from xgboost import XGBRegressor
+		_test_model = XGBRegressor(n_estimators=1)
+		_test_model.fit([[0]], [0])
+		XGBOOST_AVAILABLE = True
+	except Exception as error:
+		XGBOOST_LOAD_ERROR = error
+		XGBOOST_AVAILABLE = False
+elif BOOSTING_ENGINE != "sklearn_gbdt":
+	raise ValueError("SDN_BOOSTING_ENGINE must be sklearn_gbdt or native_xgboost")
 
 TRAIN_PATH = "data/splits/train.csv"
 VAL_PATH = "data/splits/val.csv"
@@ -23,13 +29,13 @@ MODEL_PATH_GBDT = "models/xgb_link_predictor.joblib"
 FEATURES_PATH = "models/feature_list.json"
 METRICS_PATH = "results/metrics_comparison.csv"
 TARGET = "target_util"
+CONGESTION_THRESHOLD = 85.0
 
 FEATURES = [
 	"utilization",
 	"throughput",
 	"delay",
 	"packet_loss",
-	"queue_occupancy",
 	"active_flows",
 	"util_lag_1",
 	"util_lag_2",
@@ -40,6 +46,41 @@ FEATURES = [
 	"util_ma_10s",
 	"util_slope",
 ]
+
+BASE_SEARCH_SPACE = [
+	{"n_estimators": 100, "max_depth": 2, "learning_rate": 0.03, "subsample": 1.0, "colsample_bytree": 1.0},
+	{"n_estimators": 200, "max_depth": 2, "learning_rate": 0.03, "subsample": 0.8, "colsample_bytree": 0.8},
+	{"n_estimators": 200, "max_depth": 3, "learning_rate": 0.05, "subsample": 1.0, "colsample_bytree": 0.8},
+	{"n_estimators": 300, "max_depth": 3, "learning_rate": 0.03, "subsample": 0.8, "colsample_bytree": 1.0},
+	{"n_estimators": 200, "max_depth": 4, "learning_rate": 0.05, "subsample": 0.8, "colsample_bytree": 0.8},
+	{"n_estimators": 300, "max_depth": 5, "learning_rate": 0.03, "subsample": 0.8, "colsample_bytree": 0.8},
+]
+SEARCH_SPACE = [
+	{**parameters, "high_load_weight": high_load_weight}
+	for parameters in BASE_SEARCH_SPACE
+	for high_load_weight in (1, 3, 8, 20, 30)
+]
+
+
+def create_model(parameters):
+	common = {
+		"n_estimators": parameters["n_estimators"],
+		"max_depth": parameters["max_depth"],
+		"learning_rate": parameters["learning_rate"],
+		"subsample": parameters["subsample"],
+		"random_state": 42,
+	}
+	if XGBOOST_AVAILABLE:
+		return XGBRegressor(
+			**common,
+			colsample_bytree=parameters["colsample_bytree"],
+			objective="reg:squarederror",
+			verbosity=0,
+		)
+	return GradientBoostingRegressor(
+		**common,
+		max_features=parameters["colsample_bytree"],
+	)
 
 
 def main():
@@ -70,45 +111,60 @@ def main():
 
 	if XGBOOST_AVAILABLE:
 		print("\n[Engine] Native XGBoost engine active.")
-		model = XGBRegressor(
-			n_estimators=200,
-			max_depth=5,
-			learning_rate=0.1,
-			subsample=0.8,
-			colsample_bytree=0.8,
-			objective="reg:squarederror",
-			random_state=42,
-			verbosity=0,
-		)
 	else:
-		print("\n[Engine] Windows AppLocker policy blocked xgboost.dll.")
-		print("[Fallback] Using scikit-learn GradientBoostingRegressor (100% GBDT compatible).")
-		model = GradientBoostingRegressor(
-			n_estimators=200,
-			max_depth=5,
-			learning_rate=0.1,
-			subsample=0.8,
-			random_state=42,
-		)
+		if XGBOOST_LOAD_ERROR is not None:
+			print(f"\n[Engine] Native XGBoost unavailable: {XGBOOST_LOAD_ERROR}")
+		print("\n[Engine] Using requested scikit-learn GradientBoostingRegressor.")
 
 	print("\n" + "=" * 70)
 	print("MODEL TRAINING")
 	print("=" * 70)
-	print("\n[4] Hyperparameters:")
-	print("  n_estimators: 200")
-	print("  max_depth: 5")
-	print("  learning_rate: 0.1")
-	print("  subsample: 0.8")
-	print("  random_state: 42")
-
-	print("\n[5] Training Model...")
+	print(f"\n[4] Validation-only congestion-aware search ({len(SEARCH_SPACE)} candidates)")
 	start = time.perf_counter()
-	if XGBOOST_AVAILABLE:
-		model.fit(x_train, y_train, eval_set=[(x_val, y_val)], verbose=False)
-	else:
-		model.fit(x_train, y_train)
+	best_model = None
+	best_parameters = None
+	best_val_rmse = float("inf")
+	best_val_f1 = -1.0
+	best_val_precision = 0.0
+	best_val_recall = 0.0
+	for index, parameters in enumerate(SEARCH_SPACE, 1):
+		candidate = create_model(parameters)
+		sample_weight = np.where(
+			y_train.to_numpy() >= CONGESTION_THRESHOLD,
+			parameters["high_load_weight"],
+			1.0,
+		)
+		candidate.fit(x_train, y_train, sample_weight=sample_weight)
+		val_predictions = candidate.predict(x_val)
+		val_rmse = mean_squared_error(y_val, val_predictions) ** 0.5
+		actual_high = y_val.to_numpy() >= CONGESTION_THRESHOLD
+		predicted_high = val_predictions >= CONGESTION_THRESHOLD
+		tp = int((actual_high & predicted_high).sum())
+		fp = int((~actual_high & predicted_high).sum())
+		fn = int((actual_high & ~predicted_high).sum())
+		precision = tp / (tp + fp) if tp + fp else 0.0
+		recall = tp / (tp + fn) if tp + fn else 0.0
+		f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+		print(
+			f"  {index}/{len(SEARCH_SPACE)} validation F1={f1:.4f} "
+			f"RMSE={val_rmse:.4f} params={parameters}"
+		)
+		if f1 > best_val_f1 or (f1 == best_val_f1 and val_rmse < best_val_rmse):
+			best_model = candidate
+			best_parameters = parameters
+			best_val_rmse = val_rmse
+			best_val_f1 = f1
+			best_val_precision = precision
+			best_val_recall = recall
+	model = best_model
 	training_seconds = time.perf_counter() - start
-	print(f"  Model trained in {training_seconds:.2f} seconds")
+	print(
+		f"\n[5] Selected validation F1={best_val_f1:.4f} "
+		f"precision={best_val_precision:.4f} recall={best_val_recall:.4f} "
+		f"RMSE={best_val_rmse:.4f}"
+	)
+	print(f"  Selected parameters: {best_parameters}")
+	print(f"  Search completed in {training_seconds:.2f} seconds")
 
 	print("\n" + "=" * 70)
 	print("MODEL EVALUATION ON TEST SET")
@@ -151,7 +207,15 @@ def main():
 			"features": FEATURES,
 			"target": TARGET,
 			"horizon_seconds": 5,
-			"engine": "xgboost" if XGBOOST_AVAILABLE else "sklearn_gbdt"
+			"target_alignment": "exact_timestamp",
+			"artifact_status": "current",
+			"engine": "xgboost" if XGBOOST_AVAILABLE else "sklearn_gbdt",
+			"selected_parameters": best_parameters,
+			"validation_rmse": best_val_rmse,
+			"validation_congestion_precision": best_val_precision,
+			"validation_congestion_recall": best_val_recall,
+			"validation_congestion_f1": best_val_f1,
+			"selection_metric": "validation_congestion_f1_then_rmse",
 		}, handle, indent=2)
 
 	existing = pd.read_csv(METRICS_PATH) if os.path.exists(METRICS_PATH) else pd.DataFrame()

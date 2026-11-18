@@ -1,0 +1,5 @@
+AUTHORIZED
+Candidate predictive ML model: Gradient Boosting Regressor
+Selection basis: validation congestion F1, with RMSE as tie-breaker
+Final model selection: PENDING repeated four-system network evaluation
+Critical limitation: only three future-congestion observations occur in the held-out test split

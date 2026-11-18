@@ -1,0 +1,4 @@
+PASS
+Retraining authorized: YES
+Four-system evaluation authorized: NO
+The original VM wrapper failure remains preserved in calibration-02-vm-status.txt and sdn-calibration-02.failed; it occurred after capture completion during the now-repaired RTT coverage step.
