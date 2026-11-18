@@ -66,6 +66,8 @@ Replace `--plan` with `--run` to execute all 30 experiments sequentially (about 
 
 Live lab currently requires this prepared Apple Silicon macOS workspace, QEMU, `hdiutil`, its Ubuntu base disk, and about 3 GB available RAM. Missing requirements are shown in the panel. On other Linux hosts use the experiment commands below. No production network is controlled, no website is published, and no presentation or formal report is needed.
 
+**Reproducibility status (honest version).** The dashboard, the analysis pipeline and the full unit-test suite reproduce from this repository alone (`pip install -r requirements-dashboard.txt`, or the Docker image, which serves the dashboard on the host's loopback). The LIVE experiments do not yet reproduce from the repository alone: they need a prepared Linux guest image (Ubuntu with Mininet 2.3.0, Open vSwitch, Ryu 4.34 on Python 3.8) whose qcow2 is not distributed with the repo, and provisioning that image is currently a manual process on the author's machine. Treat live runs as author-environment results until a provisioning script and image checksums are published; everything statistical in the paper can be re-derived from the committed campaign captures without the VM.
+
 ## Verify locally on macOS
 
 Use the existing project environment from this directory:

@@ -4,27 +4,28 @@
     "S1-S3"
   ],
   "horizon_steps": 5,
-  "train_snapshots": 63,
+  "train_snapshots": 59,
   "test_snapshots": 28,
-  "initial_loss": 1.1469,
-  "final_loss": 0.9696,
+  "boundary_purged_snapshots": 5,
+  "initial_loss": 2.5761,
+  "final_loss": 0.264,
   "gnn": {
-    "mae": 25.8067,
-    "rmse": 26.829
+    "mae": 18.3944,
+    "rmse": 27.3651
   },
   "persistence": {
     "mae": 14.8745,
     "rmse": 26.1071
   },
   "ridge_same_features": {
-    "mae": 27.0801,
-    "rmse": 32.1424
+    "mae": 26.2476,
+    "rmse": 31.3138
   },
   "diebold_mariano_gnn_vs_persistence": {
     "n": 56,
-    "mean_loss_diff": 38.2178,
-    "dm_stat": 0.1407,
-    "p_value": 0.888142,
+    "mean_loss_diff": 67.2706,
+    "dm_stat": 0.688,
+    "p_value": 0.491465,
     "significant_5pct": false
   }
 }

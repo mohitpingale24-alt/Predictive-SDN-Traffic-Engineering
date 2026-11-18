@@ -12,13 +12,17 @@ configuration-identical before computing anything.
 ## What the extra 32 runs actually buy
 - **Tighter intervals:** at the same SD, 95% CI half-widths shrink by
   ~29% (1/√2). Claims currently resting on overlapping CIs (latency vs
-  Reactive) get a definitive answer either way — separation or a
-  properly powered equivalence statement.
-- **A powered forecast test:** the pooled Diebold-Mariano test at n=8
-  was inconclusive (p = 0.239 on the cross-system pairing). Doubling
-  the paired samples is the standard cure, and the per-run sign test
-  (8/8 for GB on squared loss) becomes decisive at 16 runs if the
-  pattern holds (15/16 or better → p < 0.001).
+  Reactive) get narrower intervals — nothing more is promised: whether
+  they separate is an empirical outcome, and an equivalence claim
+  would additionally need a pre-specified margin and an equivalence
+  test. No power calculation has been done for any of these tests.
+- **A sharper forecast test:** the valid same-target Diebold-Mariano
+  comparison (ML vs persistence scored against identical actuals) is
+  inconclusive at campaign-02 size (pooled DM −1.41, p = 0.157). More
+  paired samples shrink the standard error; the per-run sign test
+  (8/8 for GB on squared loss) would reach p < 0.001 at 15/16 or
+  better purely by the test's own arithmetic — a statement about the
+  test, not a promise about what the new data will show.
 - **A harder congestion claim:** 0 congestion seconds across 16/16
   predictive-GB runs vs a positive mean for every other system is a
   much stronger headline than 8/8.
@@ -31,9 +35,10 @@ configuration-identical before computing anything.
   retrain, not more diamond4 runs.
 - **Novelty:** runs add statistical strength, not contribution. The
   paper's novelty case is the conformal-gated predictive controller
-  with certified coverage (90.7% empirical at 90% nominal), the
-  intervention-censoring analysis of forecast evaluation, and the
-  honest negative results — framed in RESEARCH.md.
+  (held-out conformal coverage measured honestly at 0.81 against 90%
+  nominal — the intervals undercover out of sample, reported as a
+  result, not hidden), the intervention-censoring analysis of forecast
+  evaluation, and the honest negative results — framed in RESEARCH.md.
 
 ## Venue reality check
 Scopus indexes venues, not individual papers. Target a Scopus-indexed

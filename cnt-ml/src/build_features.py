@@ -6,6 +6,7 @@ INPUT_PATH = "data/processed/telemetry_clean.csv"
 OUTPUT_PATH = "data/processed/telemetry_features.csv"
 
 HORIZON_SECONDS = 5
+LAG_SECONDS = (1, 2, 3, 5, 10)
 
 
 def attach_timestamp_target(group, horizon_seconds=HORIZON_SECONDS):
@@ -18,6 +19,35 @@ def attach_timestamp_target(group, horizon_seconds=HORIZON_SECONDS):
 	group["target_timestamp"] = group["timestamp"] + horizon_seconds
 	return group.merge(future, on="target_timestamp", how="left", validate="many_to_one")
 
+
+def attach_time_history(group):
+	"""Lag and rolling features looked up by timestamp, never row position.
+
+	A lag of k seconds means the sample at exactly t-k. Where that sample
+	does not exist (a sampling gap, a duplicate-collapsed timestamp, the
+	start of the series) the feature is NaN and the row is dropped later:
+	rows on the far side of a gap must not pose as one-second history.
+	This matches the live FeatureHistory, which restarts on any gap.
+	"""
+	group = group.sort_values("timestamp").reset_index(drop=True).copy()
+	stamps = group["timestamp"].astype(int)
+	dedup = group.drop_duplicates(subset="timestamp")
+	by_stamp = pd.Series(dedup["utilization"].to_numpy(),
+						 index=dedup["timestamp"].astype(int).to_numpy())
+
+	def at(offset):
+		return stamps.sub(offset).map(by_stamp)
+
+	for lag in LAG_SECONDS:
+		group[f"util_lag_{lag}"] = at(lag)
+	window_5 = [at(offset) for offset in range(5)]
+	window_10 = [at(offset) for offset in range(10)]
+	group["util_ma_5s"] = pd.concat(window_5, axis=1).mean(axis=1, skipna=False)
+	group["util_ma_10s"] = pd.concat(window_10, axis=1).mean(axis=1, skipna=False)
+	group["util_slope"] = group["utilization"] - at(1)
+	return group
+
+
 def main():
 	df = pd.read_csv(INPUT_PATH)
 	print(f"Loaded {len(df)} clean rows")
@@ -28,13 +58,8 @@ def main():
 		# PHASE C — Prediction target
 		group = attach_timestamp_target(group)
 
-		# PHASE D — Feature engineering
-		for lag in [1, 2, 3, 5, 10]:
-			group[f"util_lag_{lag}"] = group["utilization"].shift(lag)
-
-		group["util_ma_5s"] = group["utilization"].rolling(window=5).mean()
-		group["util_ma_10s"] = group["utilization"].rolling(window=10).mean()
-		group["util_slope"] = group["utilization"].diff()
+		# PHASE D — Feature engineering (exact-time history)
+		group = attach_time_history(group)
 
 		processed_links.append(group)
 
@@ -43,7 +68,7 @@ def main():
 	before = len(df_feat)
 	df_feat = df_feat.dropna().reset_index(drop=True)
 	print(f"Dropped {before - len(df_feat)} rows with incomplete history/target "
-		  f"(expected at the start/end of each link's series)")
+		  f"(expected at the start/end of each link's series and around sampling gaps)")
 
 	os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
 	df_feat.to_csv(OUTPUT_PATH, index=False)

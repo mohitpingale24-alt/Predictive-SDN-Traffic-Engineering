@@ -34,11 +34,19 @@ def main():
     parser.add_argument("--metrics", default=str(ROOT / "cnt-ml" / "results" / "gnn_metrics.json"))
     args = parser.parse_args()
 
-    X, Y, link_ids = build_dataset(args.telemetry, args.horizon)
+    X, Y, link_ids, snap_stamps = build_dataset(
+        args.telemetry, args.horizon, return_stamps=True)
     graph = normalized_adjacency(line_graph_adjacency(link_ids))
     split = int(len(X) * 0.7)
-    X_train, X_test = X[:split], X[split:]
-    Y_train, Y_test = Y[:split], Y[split:]
+    # Embargo: a training snapshot whose target timestamp lands inside
+    # the test period leaks the future across the split boundary. Purge
+    # the last `horizon` seconds of training snapshots.
+    test_start = snap_stamps[split]
+    keep = [i for i in range(split)
+            if snap_stamps[i] + args.horizon < test_start]
+    purged = split - len(keep)
+    X_train, Y_train = X[keep], Y[keep]
+    X_test, Y_test = X[split:], Y[split:]
     mean, std = X_train.mean(axis=(0, 1)), X_train.std(axis=(0, 1)) + 1e-9
     X_train_n = (X_train - mean) / std
     X_test_n = (X_test - mean) / std
@@ -60,6 +68,7 @@ def main():
     report = dict(
         links=link_ids, horizon_steps=args.horizon,
         train_snapshots=int(len(X_train)), test_snapshots=int(len(X_test)),
+        boundary_purged_snapshots=int(purged),
         initial_loss=round(losses[0], 4), final_loss=round(losses[-1], 4),
         gnn=metrics(prediction),
         persistence=metrics(X_test[:, :, 0]),
@@ -69,7 +78,10 @@ def main():
             (X_test[:, :, 0] - target).ravel().tolist(), horizon=args.horizon),
     )
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
-    model.save(args.output)
+    model.save(args.output, meta=dict(
+        link_ids=list(link_ids), horizon_steps=args.horizon,
+        feature_mean=[float(v) for v in mean], feature_std=[float(v) for v in std],
+        target_mean=target_mean, target_std=target_std))
     Path(args.metrics).parent.mkdir(parents=True, exist_ok=True)
     Path(args.metrics).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2))

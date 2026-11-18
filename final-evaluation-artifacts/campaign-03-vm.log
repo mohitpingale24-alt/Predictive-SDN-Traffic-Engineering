@@ -91,3 +91,126 @@ Completed reactive experiment -> /mnt/output/campaign-03/reactive/run-03
 h1 -> h2 
 h2 -> h1 
 *** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/output/campaign-03/reactive/run-04
+[reactive/run-04] complete in 107.6s
+[reactive/run-05] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/output/campaign-03/reactive/run-05
+[reactive/run-05] complete in 107.7s
+[reactive/run-06] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/output/campaign-03/reactive/run-06
+[reactive/run-06] complete in 107.7s
+[reactive/run-07] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/output/campaign-03/reactive/run-07
+[reactive/run-07] complete in 107.9s
+[reactive/run-08] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed reactive experiment -> /mnt/output/campaign-03/reactive/run-08
+[reactive/run-08] complete in 107.8s
+[predictive-baseline/run-01] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/output/campaign-03/predictive-baseline/run-01
+[predictive-baseline/run-01] complete in 107.7s
+[predictive-baseline/run-02] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/output/campaign-03/predictive-baseline/run-02
+[predictive-baseline/run-02] complete in 107.7s
+[predictive-baseline/run-03] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/output/campaign-03/predictive-baseline/run-03
+[predictive-baseline/run-03] complete in 107.7s
+[predictive-baseline/run-04] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/output/campaign-03/predictive-baseline/run-04
+[predictive-baseline/run-04] complete in 107.6s
+[predictive-baseline/run-05] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/output/campaign-03/predictive-baseline/run-05
+[predictive-baseline/run-05] complete in 107.7s
+[predictive-baseline/run-06] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/output/campaign-03/predictive-baseline/run-06
+[predictive-baseline/run-06] complete in 107.7s
+[predictive-baseline/run-07] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/output/campaign-03/predictive-baseline/run-07
+[predictive-baseline/run-07] complete in 108.1s
+[predictive-baseline/run-08] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-baseline experiment -> /mnt/output/campaign-03/predictive-baseline/run-08
+[predictive-baseline/run-08] complete in 107.7s
+[predictive-ml/run-01] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/output/campaign-03/predictive-ml/run-01
+[predictive-ml/run-01] complete in 107.8s
+[predictive-ml/run-02] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/output/campaign-03/predictive-ml/run-02
+[predictive-ml/run-02] complete in 107.9s
+[predictive-ml/run-03] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/output/campaign-03/predictive-ml/run-03
+[predictive-ml/run-03] complete in 107.8s
+[predictive-ml/run-04] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/output/campaign-03/predictive-ml/run-04
+[predictive-ml/run-04] complete in 107.8s
+[predictive-ml/run-05] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/output/campaign-03/predictive-ml/run-05
+[predictive-ml/run-05] complete in 107.8s
+[predictive-ml/run-06] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/output/campaign-03/predictive-ml/run-06
+[predictive-ml/run-06] complete in 107.8s
+[predictive-ml/run-07] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/output/campaign-03/predictive-ml/run-07
+[predictive-ml/run-07] complete in 107.8s
+[predictive-ml/run-08] starting...
+h1 -> h2 
+h2 -> h1 
+*** Results: 0% dropped (2/2 received)
+Completed predictive-ml experiment -> /mnt/output/campaign-03/predictive-ml/run-08
+[predictive-ml/run-08] complete in 107.9s
+campaign-03 complete: 32/32 runs. Next on the Mac: python3 experiments/merge_campaigns.py

@@ -40,14 +40,20 @@ def read_ping(path):
 	return sorted(measurements)
 
 
-def nearest_ping(timestamp, measurements, tolerance_seconds=1.5):
+def latest_ping(timestamp, measurements, tolerance_seconds=1.5):
+	"""Most recent ping at or before the timestamp (causal matching).
+
+	The delay feature must be knowable at prediction time: live inference
+	only ever sees past RTTs. Nearest-in-time matching silently selected
+	a ping up to 1.5 s in the future for a large share of rows, training
+	the model on information it can never have in deployment.
+	"""
 	timestamps = [item[0] for item in measurements]
-	position = bisect.bisect_left(timestamps, timestamp)
-	candidates = measurements[max(0, position - 1):position + 1]
-	if not candidates:
+	position = bisect.bisect_right(timestamps, timestamp) - 1
+	if position < 0:
 		return None
-	nearest = min(candidates, key=lambda item: abs(item[0] - timestamp))
-	return nearest[1] if abs(nearest[0] - timestamp) <= tolerance_seconds else None
+	stamp, delay = measurements[position]
+	return delay if timestamp - stamp <= tolerance_seconds else None
 
 
 def read_iperf_intervals(run_dir):
@@ -67,8 +73,27 @@ def read_iperf_intervals(run_dir):
 	return intervals
 
 
-def iperf_at(timestamp, intervals):
-	return next((item for item in intervals if item["start"] <= timestamp <= item["end"]), None)
+def iperf_completed_at(timestamp, intervals):
+	"""The most recent iperf segment that had ENDED by `timestamp`.
+
+	A segment's lost_percent is its whole-segment summary: it only
+	exists once the segment finishes. Assigning it to rows inside the
+	segment (the previous behaviour) leaked a future measurement into
+	those rows — the same class of leak as the future-ping feature.
+	Rows therefore carry the last COMPLETED segment's loss; before the
+	first segment completes there is no iperf value and the caller
+	falls back to the OpenFlow drop counters for that second.
+	"""
+	completed = [item for item in intervals if item["end"] <= timestamp]
+	return completed[-1] if completed else None
+
+
+def iperf_containing(timestamp, intervals):
+	"""The segment containing `timestamp` — used ONLY by the sampling
+	gap report to label where a gap fell. Never used to assign feature
+	values (that is iperf_completed_at's job, causally)."""
+	return next((item for item in intervals
+	             if item["start"] <= timestamp <= item["end"]), None)
 
 
 def sampling_gap_report(rows, intervals, control_events, expected_interval=1.0):
@@ -89,7 +114,7 @@ def sampling_gap_report(rows, intervals, control_events, expected_interval=1.0):
 
 	gaps = []
 	for (previous, current), affected_links in sorted(grouped.items()):
-		traffic = iperf_at(current, intervals) or iperf_at(previous, intervals)
+		traffic = iperf_containing(current, intervals) or iperf_containing(previous, intervals)
 		gaps.append({
 			"previous_timestamp": previous,
 			"current_timestamp": current,
@@ -159,16 +184,16 @@ def main():
 	excluded_no_ping = []
 	for (timestamp, link_id), bucket in sorted(buckets.items()):
 		absolute_timestamp = numeric_mean(bucket, "timestamp")
-		delay = nearest_ping(absolute_timestamp, ping_measurements)
+		delay = latest_ping(absolute_timestamp, ping_measurements)
 		if delay is None:
 			excluded_no_ping.append({
 				"normalized_timestamp": timestamp,
 				"absolute_timestamp": absolute_timestamp,
 				"link_id": link_id,
-				"reason": "no ping RTT within 1.5 seconds",
+				"reason": "no ping RTT at or before the row within 1.5 seconds",
 			})
 			continue
-		traffic = iperf_at(absolute_timestamp, iperf_intervals)
+		traffic = iperf_completed_at(absolute_timestamp, iperf_intervals)
 		packet_loss = traffic["loss_percent"] if traffic else numeric_mean(bucket, "packet_loss")
 		loss_from_iperf += int(traffic is not None)
 		normalized.append({
@@ -204,8 +229,8 @@ def main():
 		"measurement_sources": {
 			"utilization": "OpenFlow 1.3 port byte-counter deltas",
 			"throughput": "OpenFlow 1.3 port byte-counter deltas",
-			"delay": "nearest timestamped end-to-end ICMP RTT from ping.log",
-			"packet_loss": "iperf3 UDP lost_percent during traffic; OpenFlow drops outside traffic",
+			"delay": "most recent end-to-end ICMP RTT from ping.log at or before the row timestamp (causal)",
+			"packet_loss": "iperf3 UDP lost_percent of the most recent COMPLETED segment at or before the row (causal); OpenFlow drops when no segment has completed yet",
 			"active_flows": "OpenFlow 1.3 flow statistics",
 		},
 		"measurement_coverage": {
@@ -229,7 +254,8 @@ def main():
 		"dataset_preparation": {
 			"script": Path(__file__).name,
 			"script_sha256": sha256_file(Path(__file__).resolve()),
-			"rtt_policy": "exclude rows with no ping RTT within 1.5 seconds; never impute",
+			"rtt_policy": "exclude rows with no ping RTT at or before the row within 1.5 seconds; never impute; never use a later ping",
+			"loss_policy": "iperf loss comes only from segments that had completed at or before the row; a segment's own summary is never assigned to rows inside that segment",
 			"target_policy": "downstream labels must match exact timestamp t+5 seconds",
 		},
 		"sha256": {
@@ -242,8 +268,8 @@ def main():
 		},
 		"limitations": [
 			"Delay is end-to-end RTT shared across link rows, not one-way per-link delay.",
-			"iperf3 loss is a measured segment-level value repeated inside that segment.",
-			"Telemetry rows without a ping RTT within 1.5 seconds are excluded, never imputed.",
+			"iperf3 loss is a segment-level summary; rows carry the most recent completed segment's value, never the value of the segment they fall inside (that summary does not exist yet at row time).",
+			"Telemetry rows without a ping RTT at or before the row within 1.5 seconds are excluded, never imputed.",
 			"Queue occupancy is intentionally excluded from the candidate and model features.",
 		],
 	}
@@ -252,7 +278,7 @@ def main():
 	)
 	print(
 		f"Prepared {len(normalized)} audited rows -> {output}; "
-		f"excluded {len(excluded_no_ping)} row(s) without nearby ping RTT"
+		f"excluded {len(excluded_no_ping)} row(s) without a prior ping RTT"
 	)
 
 

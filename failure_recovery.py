@@ -43,17 +43,35 @@ class FailureRecoveryTracker:
                 record["reroute_from"] = old_path
                 record["reroute_to"] = new_path
 
-    def note_sample(self, timestamp, utilization_pct=None, packet_loss_pct=None):
-        """Feed live samples; recovery = utilization back under threshold."""
+    def note_sample(self, timestamp, utilization_pct=None, packet_loss_pct=None,
+                    link_id=None):
+        """Feed live samples; recovery = service back under threshold.
+
+        Samples are attributed when the caller names the measured link.
+        A sample measured on the failed link itself is recorded as outage
+        evidence but can never mark recovery: a dead link carries no
+        traffic, so its ~0% utilization is the failure, not recovery.
+        Recovery from an attributed sample requires traffic flowing on a
+        different link after a reroute — the service actually restored.
+        Unattributed samples (link_id=None) keep the legacy behaviour.
+        """
         for record in self._down.values():
-            if packet_loss_pct is not None:
-                record["loss_samples"].append((float(timestamp), float(packet_loss_pct)))
-            if utilization_pct is not None:
-                record["util_samples"].append((float(timestamp), float(utilization_pct)))
-                if (record["recovered_at"] is None
-                        and float(timestamp) > record["down_at"]
-                        and float(utilization_pct) < self.recovery_threshold_pct):
-                    record["recovered_at"] = float(timestamp)
+            own_link = link_id is not None and str(link_id) == record["link_id"]
+            if own_link or link_id is None:
+                if packet_loss_pct is not None:
+                    record["loss_samples"].append((float(timestamp), float(packet_loss_pct)))
+                if utilization_pct is not None:
+                    record["util_samples"].append((float(timestamp), float(utilization_pct)))
+            if utilization_pct is None or record["recovered_at"] is not None:
+                continue
+            if float(timestamp) <= record["down_at"] \
+                    or float(utilization_pct) >= self.recovery_threshold_pct:
+                continue
+            if own_link:
+                continue
+            if link_id is not None and record["reroute_at"] is None:
+                continue
+            record["recovered_at"] = float(timestamp)
 
     def is_down(self, link_id):
         return str(link_id) in self._down

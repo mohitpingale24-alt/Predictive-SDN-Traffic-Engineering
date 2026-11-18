@@ -11,6 +11,14 @@ CLI: python3 -m experiments.forecast_stats CAPTURE_DIR [CAPTURE_DIR ...]
 Pairs are built from each capture's predictions.csv: a forecast made at t
 is scored against the same link's measured utilization at t + horizon in
 telemetry.csv (exact-timestamp alignment, the project's existing contract).
+
+Diebold-Mariano comparisons are only ever made between forecasters that
+predicted the SAME targets: the recorded ML forecasts and persistence,
+both scored against the identical (timestamp, link) actuals of one
+capture. Errors from different captures are never paired by row
+position — different controllers change their own future utilization,
+so position i in two runs is not a shared forecast target and a paired
+test across runs is meaningless.
 """
 
 import argparse
@@ -37,8 +45,19 @@ def diebold_mariano(errors_a, errors_b, horizon=1, loss="squared"):
     n = len(diffs)
     mean = sum(diffs) / n
     if all(abs(d - mean) < 1e-15 for d in diffs):
-        return dict(n=n, mean_loss_diff=0.0, dm_stat=0.0, p_value=1.0,
-                    significant_5pct=False)
+        if abs(mean) < 1e-15:
+            return dict(n=n, mean_loss_diff=0.0, dm_stat=0.0, p_value=1.0,
+                        significant_5pct=False)
+        # A constant NONZERO loss difference is a real, uniform
+        # advantage — not equality. Its sampling variance is zero, so
+        # the DM statistic itself is undefined (division by zero), not
+        # zero. Report the mean faithfully and mark inference degenerate
+        # instead of fabricating p = 1.
+        return dict(n=n, mean_loss_diff=round(mean, 4), dm_stat=None,
+                    p_value=None, significant_5pct=False, degenerate=True,
+                    note="zero-variance loss differences: every paired "
+                         "observation favours the same forecaster, but "
+                         "the DM statistic is undefined")
     max_lag = max(1, int(round(n ** (1 / 3)))) if horizon == 1 else horizon - 1
     variance = sum((d - mean) ** 2 for d in diffs) / n
     for lag in range(1, max_lag + 1):
@@ -101,8 +120,41 @@ def build_pairs(capture_dir, horizon_seconds=5):
     return pairs
 
 
+def build_aligned_errors(capture_dir, horizon_seconds=5):
+    """(ml_error, persistence_error) pairs sharing identical targets.
+
+    Both forecasters are scored against the same (timestamp, link)
+    actual: the recorded ML prediction made at t, and persistence
+    (utilization measured at t), against utilization at t + horizon.
+    Only rows where both forecasts and the actual exist are returned,
+    which is what makes a paired Diebold-Mariano test valid here.
+    """
+    capture_dir = Path(capture_dir)
+    telemetry = {}
+    for row in _read_csv(capture_dir / "telemetry.csv"):
+        try:
+            telemetry[(int(float(row["timestamp"])), row["link_id"])] = float(row["utilization"])
+        except (ValueError, KeyError, TypeError):
+            continue
+    aligned = []
+    for row in _read_csv(capture_dir / "predictions.csv"):
+        if row.get("prediction_status") != "predicted":
+            continue
+        try:
+            stamp = int(float(row["timestamp"]))
+            predicted = float(row["predicted_utilization"])
+        except (ValueError, KeyError, TypeError):
+            continue
+        actual = telemetry.get((stamp + int(horizon_seconds), row["link_id"]))
+        persistence = telemetry.get((stamp, row["link_id"]))
+        if actual is not None and persistence is not None:
+            aligned.append((predicted - actual, persistence - actual))
+    return aligned
+
+
 def compare_captures(capture_dirs, horizon_seconds=5):
     series = {}
+    aligned_by_system = {}
     for directory in capture_dirs:
         pairs = build_pairs(directory, horizon_seconds)
         if pairs:
@@ -113,25 +165,30 @@ def compare_captures(capture_dirs, horizon_seconds=5):
             if key in series:
                 key = str(path)
             series[key] = pairs
+            aligned_by_system.setdefault(path.parent.name, []).extend(
+                build_aligned_errors(directory, horizon_seconds))
     report = {}
-    names = sorted(series)
-    for name in names:
+    for name in sorted(series):
         pairs = series[name]
         errors = [p - a for p, a in pairs]
         report[name] = dict(pairs=len(pairs),
                             mae=round(sum(abs(e) for e in errors) / len(errors), 4),
                             rmse=round(math.sqrt(sum(e * e for e in errors) / len(errors)), 4))
     dm = {}
-    for index, name in enumerate(names):
-        for other in names[index + 1:]:
-            shared = min(len(series[name]), len(series[other]))
-            errors_a = [p - a for p, a in series[name][:shared]]
-            errors_b = [p - a for p, a in series[other][:shared]]
+    for system in sorted(aligned_by_system):
+        aligned = aligned_by_system[system]
+        if len(aligned) >= 10:
             try:
-                dm["%s vs %s" % (name, other)] = diebold_mariano(errors_a, errors_b, horizon_seconds)
+                dm["%s: ml vs persistence (same targets)" % system] = diebold_mariano(
+                    [ml for ml, _ in aligned], [pe for _, pe in aligned],
+                    horizon_seconds)
             except ValueError as error:
-                dm["%s vs %s" % (name, other)] = dict(error=str(error))
-    return dict(systems=report, diebold_mariano=dm)
+                dm["%s: ml vs persistence (same targets)" % system] = dict(error=str(error))
+    return dict(systems=report, diebold_mariano=dm,
+                cross_system_dm="not reported: different controllers induce "
+                                "different futures, so errors from different "
+                                "systems share no common target and cannot be "
+                                "paired for a Diebold-Mariano test")
 
 
 def main():

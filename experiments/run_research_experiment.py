@@ -69,8 +69,20 @@ def repository_provenance(project_root):
     files = ["path_switch_controller.py", "telemetry_runtime.py", "confidence_policy.py",
              "route_transition.py", "openflow_routes.py", "experiments/scenarios.py", "experiments/run_research_experiment.py",
              "experiments/transition_probe.py", "experiments/transition_metrics.py", "experiments/quality_gate.py",
+             # Every behavior-changing input the controller can load:
+             # CN policy engines and their data files, the conformal
+             # runtime + its calibration artifact, link mapping, failure
+             # recovery, drift and anomaly modules. Omitting any of these
+             # lets behavior change under an unchanged fingerprint.
+             "conformal_runtime.py", "link_map.py", "failure_recovery.py",
+             "qos_policy.py", "acl_firewall.py", "slicing.py",
+             "acl_rules.example.json", "slices.example.json",
+             "drift_detection.py", "drift_adaptation.py",
+             "anomaly_mitigation.py", "explainability.py", "link_latency.py",
+             "topology_graph.py",
              "cnt-ml/models/gbdt_portable.json", "cnt-ml/models/gbdt_parity_fixture.json",
-             "cnt-ml/models/feature_list.json", "cnt-ml/models/gbdt_confidence.json"]
+             "cnt-ml/models/feature_list.json", "cnt-ml/models/gbdt_confidence.json",
+             "cnt-ml/models/conformal_calibration.json"]
     files.extend(str(path.relative_to(project_root)) for path in sorted((project_root / "cnt-ml/src").glob("*.py")))
     commit = subprocess.run(["git", "-C", str(project_root), "rev-parse", "HEAD"],
                             capture_output=True, text=True, check=False)
@@ -144,6 +156,7 @@ def controller_environment(project_root, output_dir, args, definition):
     environment = os.environ.copy()
     environment.update({
         "SDN_CONTROL_MODE": config["control_mode"], "SDN_ACTIVE_MODEL": config["model"],
+        "SDN_INITIAL_PATH": config.get("initial_path", "A"),
         "SDN_SAFE_REROUTE": "1" if config["safe_reroute"] else "0",
         "SDN_CONFIDENCE_GATE": "1" if config["confidence_gate"] else "0",
         "SDN_PATH_A_CAPACITY_MBPS": str(definition["path_a_capacity_mbps"]),
@@ -393,6 +406,13 @@ def run(args=None):
             rtt_definition="Successful ICMP round trip at 0.1 second nominal interval; logged ping timestamp is reply time.",
             additional_traffic="50 small UDP probes/s and 10 ICMP requests/s per host pair, in addition to offered iperf application rate."),
         environment=host_environment(), repository=repository_provenance(project_root),
+        # The effective controller configuration, recorded verbatim:
+        # two runs are only comparable when every SDN_* setting that
+        # reached the controller matches, not just the nominal system
+        # name. (Output paths are run-specific and excluded.)
+        effective_controller_environment={
+            key: value for key, value in sorted(environment.items())
+            if key.startswith("SDN_") and not key.endswith(("_CSV", "_LOG"))},
     )
     confidence_path = project_root / "cnt-ml/models/gbdt_confidence.json"
     if confidence_path.exists():

@@ -228,6 +228,11 @@ def load_run(run_dir):
 		raise ValueError(f"Run is not complete: {run_dir}")
 	check_run(run_dir, metadata)
 	telemetry = read_csv(run_dir / "telemetry.csv")
+	if not telemetry:
+		# A "complete" run with no telemetry rows has no measured
+		# utilization at all; summarizing it would report a fabricated
+		# zero congestion duration — a perfect score for a broken capture.
+		raise ValueError(f"Run has no telemetry rows: {run_dir}")
 	predictions = read_csv(run_dir / "predictions.csv")
 	events = read_csv(run_dir / "control_events.csv")
 	timeline = event_timeline(events)

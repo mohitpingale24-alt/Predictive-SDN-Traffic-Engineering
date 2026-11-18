@@ -25,10 +25,11 @@ class ResearchExperimentTests(unittest.TestCase):
 
     def test_full_campaign_has_all_matched_systems_and_reverses_order(self):
         plan = campaign_plan(3)
-        self.assertEqual(len(plan), 7 * 3 * 5)
+        self.assertEqual(len(plan), 7 * 3 * len(PRIMARY_SYSTEMS))
         self.assertEqual({row["system"] for row in plan}, set(PRIMARY_SYSTEMS))
-        self.assertEqual([row["system"] for row in plan[:5]], list(PRIMARY_SYSTEMS))
-        self.assertEqual([row["system"] for row in plan[5:10]], list(reversed(PRIMARY_SYSTEMS)))
+        width = len(PRIMARY_SYSTEMS)
+        self.assertEqual([row["system"] for row in plan[:width]], list(PRIMARY_SYSTEMS))
+        self.assertEqual([row["system"] for row in plan[width:2 * width]], list(reversed(PRIMARY_SYSTEMS)))
         ablation = campaign_plan(1, include_ablations=True, scenarios=["near-threshold"])
         self.assertEqual({row["system"] for row in ablation}, set(PRIMARY_SYSTEMS + ABLATION_SYSTEMS))
 

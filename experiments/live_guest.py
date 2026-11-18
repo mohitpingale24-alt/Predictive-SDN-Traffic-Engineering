@@ -21,6 +21,11 @@ def main():
         temporary.write_text(json.dumps(dict(status=value, message=message)))
         temporary.replace(args.output / 'guest.json')
     status('running', 'Experiment running')
+    # Last line of defense: the legacy runner cannot execute 'ecmp'
+    # (its system choices exclude it), so never dispatch ecmp there
+    # even if a caller bypasses live_runtime's scenario coercion.
+    if args.system == 'ecmp' and args.scenario == 'legacy':
+        args.scenario = 'ramp'
     runner = 'run_experiment.py' if args.scenario == 'legacy' else 'run_research_experiment.py'
     command = [sys.executable, str(Path(__file__).with_name(runner)),
                '--system', args.system, '--output-dir', str(args.output / 'capture')]

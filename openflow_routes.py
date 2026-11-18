@@ -123,3 +123,55 @@ class OpenFlowRouteAdapter:
     def record(self, transition_id, stage, status, old_path, new_path, detail):
         self.controller._record_transition(transition_id, stage, status,
                                            old_path, new_path, detail)
+
+
+_PROTOCOL_NUMBERS = {"tcp": 6, "udp": 17, "icmp": 1}
+
+
+def connection_match_fields(in_port=None, eth_src=None, eth_dst=None,
+                            ip_src=None, ip_dst=None, protocol=None,
+                            src_port=None, dst_port=None, dscp=None):
+    """OFPMatch kwargs for exactly one connection, never a host pair.
+
+    Access-switch flows (learned forwarding, ACL drops) must be scoped to
+    the connection that was actually policy-checked: a flow keyed only on
+    MAC addresses silently forwards — or blocks — every later connection
+    between the same hosts without a policy decision. Fields left as None
+    are omitted, so an IP-pair scope (slice isolation) is expressed by
+    passing only the addresses, and a full 5-tuple scope by passing the
+    protocol and ports as well.
+    """
+    fields = {}
+    if in_port is not None:
+        fields["in_port"] = in_port
+    if eth_src is not None:
+        fields["eth_src"] = eth_src
+    if eth_dst is not None:
+        fields["eth_dst"] = eth_dst
+    if ip_src is None and ip_dst is None:
+        return fields
+    fields["eth_type"] = 0x0800
+    if ip_src is not None:
+        fields["ipv4_src"] = ip_src
+    if ip_dst is not None:
+        fields["ipv4_dst"] = ip_dst
+    if dscp is not None:
+        fields["ip_dscp"] = int(dscp)
+    proto = None
+    if isinstance(protocol, int):
+        proto = protocol
+    elif protocol is not None:
+        proto = _PROTOCOL_NUMBERS.get(str(protocol).lower())
+    if proto is not None:
+        fields["ip_proto"] = proto
+        if src_port is not None:
+            if proto == 6:
+                fields["tcp_src"] = int(src_port)
+            elif proto == 17:
+                fields["udp_src"] = int(src_port)
+        if dst_port is not None:
+            if proto == 6:
+                fields["tcp_dst"] = int(dst_port)
+            elif proto == 17:
+                fields["udp_dst"] = int(dst_port)
+    return fields

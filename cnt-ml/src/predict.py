@@ -9,9 +9,9 @@ try:
 except ImportError:
 	from portable_gbdt import PortableGBDT
 
-# Persistence remains the safe live default until telemetry collected from the
-# actual topology has been used for held-out model comparison. Set
-# SDN_ACTIVE_MODEL=auto to select the lowest-RMSE model with a saved artifact.
+# Persistence remains the safe live default. SDN_ACTIVE_MODEL=auto resolves
+# to the frozen validation-selected model (gradient_boosting) when its
+# artifact exists — never to a ranking of the held-out test tables.
 ACTIVE_MODEL = os.getenv("SDN_ACTIVE_MODEL", "persistence").strip().lower()
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
 FEATURES_PATH = os.path.join(MODELS_DIR, "feature_list.json")
@@ -20,7 +20,9 @@ XGB_MODEL_PATH_JSON = os.path.join(MODELS_DIR, "xgb_link_predictor.json")
 XGB_MODEL_PATH_JOBLIB = os.path.join(MODELS_DIR, "xgb_link_predictor.joblib")
 METRICS_PATH = os.path.join(os.path.dirname(__file__), "..", "results", "metrics_comparison.csv")
 CONGESTION_METRICS_PATH = os.path.join(os.path.dirname(__file__), "..", "results", "congestion_metrics.csv")
-MODEL_SELECTION_METRIC = os.getenv("SDN_MODEL_SELECTION_METRIC", "congestion_f1").strip().lower()
+# Retained for provenance reporting only: model selection no longer
+# reads the test-result tables (see resolve_active_model).
+MODEL_SELECTION_METRIC = "frozen_validation_choice"
 
 _feature_dict = None
 _linear_model = None
@@ -96,11 +98,18 @@ def _canonical_model_name(metrics_name: str):
 
 
 def resolve_active_model() -> str:
-	"""Resolve an explicit model or select the best available saved model.
+	"""Resolve an explicit model, or the frozen default under "auto".
 
-	Automatic selection prefers held-out congestion F1 because the controller's
-	decision is threshold-based. Set SDN_MODEL_SELECTION_METRIC=rmse to rank by
-	RMSE then MAE. A model is eligible only when its inference artifact exists.
+	"auto" previously ranked candidate models by the committed
+	metrics_comparison / congestion_metrics CSVs. Those tables are the
+	held-out TEST comparison — choosing the production model by them is
+	test-set selection, and the chosen model would change silently
+	whenever the tables are regenerated. Model choice belongs to
+	validation (the frozen campaign selected gradient_boosting on
+	validation F1; see cnt-ml/models/feature_list.json). "auto" now
+	resolves to that frozen choice when its artifact exists, and to
+	persistence otherwise. Set SDN_ACTIVE_MODEL explicitly to run any
+	other model.
 	"""
 	global _resolved_model
 	if _resolved_model is not None:
@@ -118,25 +127,9 @@ def resolve_active_model() -> str:
 		_resolved_model = ACTIVE_MODEL
 		return _resolved_model
 
-	if MODEL_SELECTION_METRIC == "congestion_f1" and os.path.exists(CONGESTION_METRICS_PATH):
-		import pandas as pd
-		congestion = pd.read_csv(CONGESTION_METRICS_PATH).sort_values("F1", ascending=False)
-		for metrics_name in congestion["Model"]:
-			candidate = _canonical_model_name(metrics_name)
-			if candidate and _artifact_available(candidate):
-				_resolved_model = candidate
-				return _resolved_model
-
-	if os.path.exists(METRICS_PATH):
-		import pandas as pd
-		metrics = pd.read_csv(METRICS_PATH)
-		if {"Model", "RMSE", "MAE"}.issubset(metrics.columns):
-			metrics = metrics.sort_values(["RMSE", "MAE"], ascending=True)
-			for metrics_name in metrics["Model"]:
-				candidate = _canonical_model_name(metrics_name)
-				if candidate and _artifact_available(candidate):
-					_resolved_model = candidate
-					return _resolved_model
+	if _artifact_available("gradient_boosting"):
+		_resolved_model = "gradient_boosting"
+		return _resolved_model
 
 	_resolved_model = "persistence"
 	return _resolved_model

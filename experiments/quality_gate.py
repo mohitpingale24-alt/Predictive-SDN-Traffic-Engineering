@@ -43,6 +43,27 @@ def check_run(directory, metadata):
         raise ValueError("Incomplete workload capture")
     for path in files:
         receiver_summary(json.loads(path.read_text()))
+    # Outcome evidence must exist and be finite. The gate previously
+    # never opened telemetry.csv or ping.log, so a capture missing its
+    # measured outcomes could pass and later summarize as zero
+    # congestion — a perfect score for a broken run.
+    telemetry_path = directory / "telemetry.csv"
+    if not telemetry_path.exists():
+        raise ValueError("Missing telemetry.csv")
+    with open(telemetry_path, newline="") as handle:
+        telemetry_rows = list(csv.DictReader(handle))
+    if len(telemetry_rows) < 10:
+        raise ValueError("Insufficient telemetry rows")
+    for row in telemetry_rows:
+        try:
+            value = float(row["utilization"])
+        except (KeyError, TypeError, ValueError):
+            raise ValueError("Telemetry row without a numeric utilization")
+        if not math.isfinite(value):
+            raise ValueError("Non-finite telemetry utilization")
+    ping_path = directory / "ping.log"
+    if not ping_path.exists() or "time" not in ping_path.read_text(errors="replace"):
+        raise ValueError("Missing ping samples in ping.log")
     with open(directory / "predictions.csv", newline="") as handle:
         rows = list(csv.DictReader(handle))
     eligible = [row for row in rows if float(row["timestamp"]) >= metadata["workload_started_at"] + 11]

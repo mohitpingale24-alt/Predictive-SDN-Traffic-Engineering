@@ -20,7 +20,7 @@ if ML_SRC not in sys.path:
 from predict import get_model_info, predict_future_utilization
 from confidence import ConfidenceEstimator
 from confidence_policy import select_signals
-from openflow_routes import OpenFlowRouteAdapter
+from openflow_routes import OpenFlowRouteAdapter, connection_match_fields
 from route_transition import SafeRouteTransition
 try:
     from failure_recovery import FailureRecoveryTracker
@@ -64,6 +64,12 @@ SWITCH_NAMES = {1: 's1', 2: 's2', 3: 's3', 4: 's4', 5: 's5', 6: 's6'}
 S1_PATH_PORT = {'A': 2, 'B': 3}
 S4_PATH_PORT = {'A': 2, 'B': 3}
 S1_PORT_LINK = {2: ('A', 'S1-S2'), 3: ('B', 'S1-S3')}
+S4_PORT_LINK = {2: ('A', 'S2-S4'), 3: ('B', 'S3-S4')}
+# Every link a path traverses. Failure handling must consider the
+# whole path: a path is unusable when ANY of its links is down, not
+# only its s1-side link.
+PATH_LINKS = {'A': ('S1-S2', 'S2-S4'), 'B': ('S1-S3', 'S3-S4')}
+PORT_LINK_BY_DPID = {1: S1_PORT_LINK, 4: S4_PORT_LINK}
 MONITOR_INTERVAL_SECONDS = float(os.getenv('SDN_MONITOR_INTERVAL_SECONDS', '1'))
 LINK_CAPACITY_MBPS = float(os.getenv('SDN_LINK_CAPACITY_MBPS', '10'))
 PATH_CAPACITY_MBPS = {
@@ -113,7 +119,12 @@ class PathSwitchController(app_manager.RyuApp):
 
     def __init__(self, *args, **kwargs):
         super(PathSwitchController, self).__init__(*args, **kwargs)
-        self.active_path = 'A'
+        # SDN_INITIAL_PATH exists so the always-fastest-path baseline
+        # (static control pinned to the higher-capacity route) is a
+        # first-class configuration, not a code edit.
+        self.active_path = os.getenv('SDN_INITIAL_PATH', 'A').strip().upper()
+        if self.active_path not in ('A', 'B'):
+            raise ValueError("SDN_INITIAL_PATH must be A or B")
         self.datapaths = {}
         self.flow_counts = {}
         self.latest_utilizations = {}
@@ -129,7 +140,7 @@ class PathSwitchController(app_manager.RyuApp):
         self.all_link_tracker = PortRateTracker()
         self.link_map = load_link_map(LINK_MAP_PATH)
         self._canonical_reporters = canonical_reporters(self.link_map)
-        self.feature_history = FeatureHistory(require_contiguous=os.getenv('SDN_CONTIGUOUS_HISTORY', '0') == '1')
+        self.feature_history = FeatureHistory(require_contiguous=os.getenv('SDN_CONTIGUOUS_HISTORY', '1') == '1')
         self.rtt = RecentRTT(os.getenv('SDN_PING_LOG'))
         self.telemetry_recorder = TelemetryCsvRecorder(TELEMETRY_PATH)
         self.all_links_recorder = TelemetryCsvRecorder(ALL_LINKS_CSV_PATH)
@@ -145,7 +156,7 @@ class PathSwitchController(app_manager.RyuApp):
             timeout_seconds=float(os.getenv('SDN_BARRIER_TIMEOUT_SECONDS', '3')),
             drain_seconds=float(os.getenv('SDN_DRAIN_SECONDS', '0.5')))
         if SAFE_REROUTE:
-            self._record_transition(0, 'controller', 'ready', 'A', 'A',
+            self._record_transition(0, 'controller', 'ready', self.active_path, self.active_path,
                                     'Shared-route make-before-break enabled; not cross-switch atomic')
         if CONTROL_MODE not in {'static', 'reactive', 'predictive', 'ecmp'}:
             raise ValueError("SDN_CONTROL_MODE must be static, reactive, predictive, or ecmp")
@@ -176,6 +187,7 @@ class PathSwitchController(app_manager.RyuApp):
                 "and CN policy checks are OFF for this run",
                 TOPNOTCH_IMPORT_ERROR)
         self._pending_predictions = {'A': [], 'B': []}
+        self._unpaired_forecasts = 0
         self._last_features = {}
         self._feature_importance = None
         self._down_links = set()
@@ -218,7 +230,9 @@ class PathSwitchController(app_manager.RyuApp):
                     PROJECT_ROOT, 'cnt-ml', 'models', 'conformal_calibration.json'))
                 if os.path.exists(artifact):
                     self.conformal = ConformalRuntime(
-                        artifact, threshold=float(os.getenv('SDN_CONGESTION_THRESHOLD', '85')))
+                        artifact, threshold=float(os.getenv('SDN_CONGESTION_THRESHOLD', '85')),
+                        model_path=os.path.join(PROJECT_ROOT, 'cnt-ml', 'models',
+                                                'gbdt_portable.json'))
                     self.logger.info("Conformal intervals active: coverage=%s radius=%s",
                                      self.conformal.nominal_coverage, self.conformal.base_radius)
                 else:
@@ -349,7 +363,24 @@ class PathSwitchController(app_manager.RyuApp):
         datapath.send_msg(parser.OFPFlowMod(
             datapath=datapath, priority=10,
             match=parser.OFPMatch(in_port=1), instructions=inst))
+        # Return forwarding: traffic arriving from either core branch is
+        # destined for the edge host on port 1. Without these rules it
+        # hits the table-miss entry and is discarded by the controller.
+        for branch_port in (2, 3):
+            return_inst = [parser.OFPInstructionActions(
+                ofp.OFPIT_APPLY_ACTIONS, [parser.OFPActionOutput(1)])]
+            datapath.send_msg(parser.OFPFlowMod(
+                datapath=datapath, priority=10,
+                match=parser.OFPMatch(in_port=branch_port),
+                instructions=return_inst))
         self.logger.info("ECMP SELECT group installed on s%s (weights from capacities)", datapath.id)
+
+    def _path_blocked_link(self, path):
+        """The recorded-down link that makes `path` unusable, or None."""
+        for link_id in PATH_LINKS[path]:
+            if link_id in self._down_links:
+                return link_id
+        return None
 
     @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
     def port_status_handler(self, ev):
@@ -357,9 +388,13 @@ class PathSwitchController(app_manager.RyuApp):
             return
         msg = ev.msg
         datapath = msg.datapath
-        if datapath.id != 1 or msg.desc.port_no not in S1_PORT_LINK:
+        # Both edge switches report failures: s1 sees S1-S2/S1-S3, s4
+        # sees S2-S4/S3-S4. Handling only s1 (the previous behaviour)
+        # left s4-side failures invisible to rerouting.
+        port_link = PORT_LINK_BY_DPID.get(datapath.id)
+        if port_link is None or msg.desc.port_no not in port_link:
             return
-        path, link_id = S1_PORT_LINK[msg.desc.port_no]
+        path, link_id = port_link[msg.desc.port_no]
         ofp = datapath.ofproto
         is_down = (msg.reason == ofp.OFPPR_DELETE
                    or bool(msg.desc.state & ofp.OFPPS_LINK_DOWN))
@@ -374,8 +409,7 @@ class PathSwitchController(app_manager.RyuApp):
             self.logger.error("Link failure: %s (path %s)", link_id, path)
             if path == self.active_path:
                 alternative = 'B' if path == 'A' else 'A'
-                alt_link = S1_PORT_LINK[S1_PATH_PORT[alternative]]
-                if alt_link[1] not in self._down_links:
+                if self._path_blocked_link(alternative) is None:
                     self.switch_path(alternative,
                                      reason='link failure on %s' % link_id)
         elif not is_down and link_id in self._down_links:
@@ -436,8 +470,23 @@ class PathSwitchController(app_manager.RyuApp):
         if not self._topnotch or not self._track_pairs:
             return
         pending = self._pending_predictions[path]
-        while pending and now - pending[0][0] >= self.prediction_horizon:
-            _, predicted = pending.pop(0)
+        # Pair each forecast with the observation AT ITS OWN target
+        # time (issue time + horizon), within half a sampling interval.
+        # The previous loop paired every aged forecast with the current
+        # actual, so after a telemetry gap several different target
+        # times were all scored against one observation — corrupting
+        # the ACI stream, the residual window and every drift detector.
+        # Forecasts whose target passed unobserved expire unpaired and
+        # are counted, never silently re-paired.
+        while pending:
+            issued_at, predicted = pending[0]
+            target = issued_at + self.prediction_horizon
+            if target > now + 0.5:
+                break
+            pending.pop(0)
+            if target < now - 0.5:
+                self._unpaired_forecasts += 1
+                continue
             if self.conformal is not None:
                 self.conformal.update(predicted, actual)
                 self._recent_residuals.append(abs(predicted - actual))
@@ -543,10 +592,8 @@ class PathSwitchController(app_manager.RyuApp):
                                 match=match, instructions=inst)
         datapath.send_msg(mod)
 
-    def _install_drop(self, datapath, in_port, eth):
-        self.add_flow(datapath, 20,
-                      self._match(datapath, in_port=in_port,
-                                  eth_src=eth.src, eth_dst=eth.dst), [])
+    def _install_drop(self, datapath, match_fields):
+        self.add_flow(datapath, 20, self._match(datapath, **match_fields), [])
 
     def _cn_event(self, event, reason):
         self.control_event_recorder.append({
@@ -560,14 +607,18 @@ class PathSwitchController(app_manager.RyuApp):
         """ACL + slicing + QoS for access-switch packet-ins.
 
         Returns 'drop', a meter id, or None. A deny also installs a drop
-        flow so repeated packets stop reaching the controller.
+        flow scoped to exactly what was denied: the full connection for
+        an ACL rule, the IP pair for slice isolation. A MAC-pair drop
+        would also block unrelated permitted traffic between the hosts.
         """
         ip = pkt.get_protocol(ipv4.ipv4)
         if ip is None:
             return None
         if self.slice_manager is not None and \
                 self.slice_manager.isolation_decision(ip.src, ip.dst) == 'deny':
-            self._install_drop(datapath, in_port, eth)
+            self._install_drop(datapath, connection_match_fields(
+                in_port=in_port, eth_src=eth.src, eth_dst=eth.dst,
+                ip_src=ip.src, ip_dst=ip.dst))
             self._cn_event('slice_isolation_drop',
                            '%s -> %s crosses slice boundary' % (ip.src, ip.dst))
             return 'drop'
@@ -578,7 +629,10 @@ class PathSwitchController(app_manager.RyuApp):
             action, rule_index = self.acl_engine.evaluate(
                 ip.src, ip.dst, protocol_name(ip.proto), src_port, dst_port)
             if action == 'deny':
-                self._install_drop(datapath, in_port, eth)
+                self._install_drop(datapath, connection_match_fields(
+                    in_port=in_port, eth_src=eth.src, eth_dst=eth.dst,
+                    ip_src=ip.src, ip_dst=ip.dst, protocol=ip.proto,
+                    src_port=src_port, dst_port=dst_port))
                 self._cn_event('acl_drop', 'rule %s denied %s -> %s %s'
                                % (rule_index, ip.src, ip.dst, protocol_name(ip.proto)))
                 return 'drop'
@@ -684,7 +738,7 @@ class PathSwitchController(app_manager.RyuApp):
             if sample is None:
                 continue
             if self._topnotch:
-                self.failure_tracker.note_sample(now, sample['utilization'], sample['packet_loss'])
+                self.failure_tracker.note_sample(now, sample['utilization'], sample['packet_loss'], link_id=link_id)
                 self._observe_drift(path, now, sample['utilization'])
                 mitigation = self.anomaly_detector.observe(link_id, sample['throughput'], now)
                 if mitigation is not None:
@@ -699,12 +753,18 @@ class PathSwitchController(app_manager.RyuApp):
                     self.logger.error("Traffic anomaly on %s: %s", link_id, mitigation['kind'])
                     if self.anomaly_mitigation and path == self.active_path:
                         alternative = 'B' if path == 'A' else 'A'
-                        if S1_PORT_LINK[S1_PATH_PORT[alternative]][1] not in self._down_links:
+                        if self._path_blocked_link(alternative) is None:
                             self.switch_path(alternative, reason='anomaly mitigation: %s' % mitigation['kind'])
             rtt = self.rtt.at(now)
             sample['delay'] = rtt if rtt is not None else ''
             self.telemetry_recorder.append(sample)
-            if self._topnotch and self.latency_tracker is not None and rtt is not None:
+            # The ping RTT measures the ACTIVE path end to end.
+            # Attributing it to the inactive path's links as well (the
+            # previous behaviour) fabricated per-link latencies for a
+            # path carrying no traffic; the inactive path now simply
+            # goes stale and reports unknown.
+            if (self._topnotch and self.latency_tracker is not None and rtt is not None
+                    and path == self.active_path):
                 links = self._path_links.get(path, [])
                 if links:
                     self.latency_tracker.observe_path_rtt(links, rtt, now)
@@ -914,6 +974,21 @@ class PathSwitchController(app_manager.RyuApp):
             raise ValueError("new_path must be A or B")
         if new_path == self.active_path:
             return
+        target_link = self._path_blocked_link(new_path)
+        if target_link is not None:
+            # Never route onto a path with a link the port-status
+            # handler has marked down: a failed link reports ~0%
+            # utilization, which the policy otherwise reads as an
+            # attractive empty path. The check covers BOTH links of the
+            # path (s1-side and s4-side).
+            self.logger.error("Refusing reroute to path %s: link %s is down (requested: %s)",
+                              new_path, target_link, reason)
+            self.control_event_recorder.append({
+                'timestamp': time.time(), 'event': 'reroute_blocked',
+                'control_mode': CONTROL_MODE, 'old_path': self.active_path,
+                'new_path': new_path, 'signal_a': '', 'signal_b': '',
+                'reason': 'target link %s is down; requested: %s' % (target_link, reason)})
+            return
         old_path = self.active_path
         if SAFE_REROUTE:
             return self.route_transition.start(old_path, new_path, time.time(), reason,
@@ -937,7 +1012,12 @@ class PathSwitchController(app_manager.RyuApp):
         self.active_path = new_path
         if SAFE_REROUTE:
             self.reroute_policy.commit(time.time())
-        with open(PATH_FILE, 'w') as f:
+        # PATH_FILE lives in shared /tmp: open with O_NOFOLLOW and
+        # owner-only permissions so a pre-planted symlink cannot
+        # redirect the write into another user's file.
+        fd = os.open(PATH_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+                     | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+        with os.fdopen(fd, 'w') as f:
             f.write(new_path)
         self.control_event_recorder.append({
             'timestamp': time.time(), 'event': 'reroute',
@@ -982,11 +1062,26 @@ class PathSwitchController(app_manager.RyuApp):
                 return
             actions = self._actions_output(datapath, out_port)
             if out_port != datapath.ofproto.OFPP_FLOOD:
-                flow_match = self._match(datapath, in_port=in_port, eth_dst=eth.dst)
-                if meter_id:
-                    self.add_flow_metered(datapath, 10, flow_match, actions, meter_id)
-                else:
-                    self.add_flow(datapath, 10, flow_match, actions)
+                ip = pkt.get_protocol(ipv4.ipv4)
+                if ip is not None:
+                    # Install forwarding for exactly the connection that
+                    # was just policy-checked. A flow keyed only on the
+                    # destination MAC would forward every later connection
+                    # between these hosts with no ACL/slicing/QoS check.
+                    segment = pkt.get_protocol(tcp.tcp) or pkt.get_protocol(udp.udp)
+                    flow_match = self._match(datapath, **connection_match_fields(
+                        in_port=in_port, eth_src=eth.src, eth_dst=eth.dst,
+                        ip_src=ip.src, ip_dst=ip.dst, protocol=ip.proto,
+                        src_port=segment.src_port if segment is not None else None,
+                        dst_port=segment.dst_port if segment is not None else None,
+                        dscp=ip.tos >> 2))
+                    if meter_id:
+                        self.add_flow_metered(datapath, 10, flow_match, actions, meter_id)
+                    else:
+                        self.add_flow(datapath, 10, flow_match, actions)
+                # Non-IP traffic (ARP and friends) installs no flow: each
+                # packet returns to the controller, so it can never be
+                # used to establish unchecked forwarding state.
             data = msg.data if msg.buffer_id == datapath.ofproto.OFP_NO_BUFFER else None
             datapath.send_msg(datapath.ofproto_parser.OFPPacketOut(
                 datapath=datapath, buffer_id=msg.buffer_id, in_port=in_port,

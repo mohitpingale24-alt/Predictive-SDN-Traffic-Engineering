@@ -8,9 +8,14 @@ from copy import deepcopy
 import math
 
 
-PROTOCOL_VERSION = "safe-te-v1"
+# v2 (review response): adds the static-fastest primary baseline —
+# static control pinned to the higher-capacity path. A learning system
+# that cannot beat "always use the fast route" has not demonstrated
+# anything, so that comparison is part of the primary protocol now.
+PROTOCOL_VERSION = "safe-te-v2"
 SYSTEM_CONFIG = {
     "static": dict(control_mode="static", model="persistence", confidence_gate=False, safe_reroute=False),
+    "static-fastest": dict(control_mode="static", model="persistence", confidence_gate=False, safe_reroute=False, initial_path="B"),
     "reactive": dict(control_mode="reactive", model="persistence", confidence_gate=False, safe_reroute=False),
     "predictive-baseline": dict(control_mode="predictive", model="persistence", confidence_gate=False, safe_reroute=False),
     "predictive-ml": dict(control_mode="predictive", model="gradient_boosting", confidence_gate=False, safe_reroute=False),
@@ -19,8 +24,10 @@ SYSTEM_CONFIG = {
     "predictive-safe-only": dict(control_mode="predictive", model="gradient_boosting", confidence_gate=False, safe_reroute=True),
     "ecmp": dict(control_mode="ecmp", model="persistence", confidence_gate=False, safe_reroute=False),
 }
-PRIMARY_SYSTEMS = tuple(SYSTEM_CONFIG)[:5]
-ABLATION_SYSTEMS = tuple(SYSTEM_CONFIG)[5:]
+PRIMARY_SYSTEMS = ("static", "static-fastest", "reactive",
+                   "predictive-baseline", "predictive-ml", "predictive-safe")
+ABLATION_SYSTEMS = tuple(name for name in SYSTEM_CONFIG
+                         if name not in PRIMARY_SYSTEMS)
 
 
 def _segment(name, rate, duration):
@@ -138,8 +145,7 @@ def campaign_plan(repetitions=3, include_ablations=False, scenarios=None):
     if isinstance(repetitions, bool) or not isinstance(repetitions, int) or repetitions < 1:
         raise ValueError("Repetitions must be a positive integer")
     names = list(SCENARIOS if scenarios is None else scenarios)
-    for name in names:
-        scenario_definition(name)
+    topologies = {name: scenario_definition(name)["topology"] for name in names}
     systems = PRIMARY_SYSTEMS + (ABLATION_SYSTEMS if include_ablations else ())
     plan = []
     for name in names:
@@ -147,5 +153,5 @@ def campaign_plan(repetitions=3, include_ablations=False, scenarios=None):
             ordered = systems if repetition % 2 else tuple(reversed(systems))
             for system in ordered:
                 plan.append(dict(system=system, scenario=name, repetition=repetition,
-                                 topology=SCENARIOS[name]["topology"]))
+                                 topology=topologies[name]))
     return plan

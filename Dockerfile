@@ -3,8 +3,8 @@
 # Open vSwitch); this image covers the dashboard, analysis and all unit tests.
 FROM python:3.12-slim
 WORKDIR /app
-COPY requirements-controller.txt requirements-ml.txt ./
-RUN pip install --no-cache-dir -r requirements-controller.txt -r requirements-ml.txt pytest
+COPY requirements-dashboard.txt ./
+RUN pip install --no-cache-dir -r requirements-dashboard.txt pytest
 COPY . .
 EXPOSE 8765
-CMD ["python3", "frontend/server.py", "--port", "8765"]
+CMD ["python3", "frontend/server.py", "--host", "0.0.0.0", "--port", "8765"]

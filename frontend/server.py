@@ -822,7 +822,9 @@ def conformal_detail():
     if artifact:
         aci = artifact.get('aci') or {}
         scores = [_num(v) for v in (aci.get('scores') or [])]
-        empirical = artifact.get('empirical_coverage_on_calibration') or {}
+        heldout = artifact.get('heldout_coverage') or {}
+        eval_cov = artifact.get('eval_capture_coverage') or {}
+        aci_heldout = aci.get('heldout_coverage') or {}
         artifact_block = dict(
             method=artifact.get('method'),
             alpha=_num(artifact.get('alpha')),
@@ -830,13 +832,18 @@ def conformal_detail():
             radius_percentage_points=_num(
                 artifact.get('radius_percentage_points')),
             calibration_rows=artifact.get('calibration_rows'),
-            empirical_n=empirical.get('n'),
-            empirical_coverage=_num(empirical.get('coverage')),
-            empirical_mean_width=_num(empirical.get('mean_width')),
+            heldout_n=heldout.get('n'),
+            heldout_coverage=_num(heldout.get('coverage')),
+            heldout_mean_width=_num(heldout.get('mean_width')),
+            aci_heldout_coverage=_num(aci_heldout.get('coverage')),
+            eval_capture_n=eval_cov.get('n'),
+            eval_capture_coverage=_num(eval_cov.get('coverage')),
             aci_gamma=_num(aci.get('gamma')),
             aci_initial_radius=_num(
                 aci.get('initial_radius_percentage_points')),
             aci_scores=_stats_block(scores),
+            gate_diagnostics=artifact.get('gate_diagnostics') or {},
+            calibration_ranges=artifact.get('calibration_ranges') or {},
             provenance=artifact.get('provenance') or {})
 
     def public_run(record):
@@ -2798,9 +2805,13 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, default=8765)
+    parser.add_argument('--host', default='127.0.0.1',
+                        help='bind address (127.0.0.1 by default; the '
+                             'Docker image passes 0.0.0.0 so the published '
+                             'port is reachable)')
     args = parser.parse_args()
-    server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
-    print(f'SDN frontend: http://127.0.0.1:{args.port}', flush=True)
+    server = ThreadingHTTPServer((args.host, args.port), Handler)
+    print(f'SDN frontend: http://{args.host}:{args.port}', flush=True)
     try: server.serve_forever()
     except KeyboardInterrupt: pass
     finally: server.server_close()

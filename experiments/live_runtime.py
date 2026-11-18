@@ -96,6 +96,20 @@ def next_repetition(system, scenario, topology, source_hashes):
     return max(indices or [0]) + 1
 
 
+def resolve_scenario(system, scenario):
+    """Map a requested (system, scenario) pair to one a runner can run.
+
+    'ecmp' joins the predictive-safe family here: the legacy runner
+    (run_experiment.py) has no ECMP system at all, so dispatching
+    ecmp+legacy to it can only fail inside the guest. ECMP exists
+    only in the research runner, which needs a research scenario.
+    """
+    if system in ('predictive-safe', 'predictive-confidence',
+                  'predictive-safe-only', 'ecmp') and scenario == 'legacy':
+        return 'ramp'
+    return scenario
+
+
 def start(system, scenario='legacy', topology='diamond4', repetition=None, campaign_id=None):
     if system not in SYSTEMS: raise ValueError('Unknown controller system')
     if scenario not in SCENARIOS or topology not in TOPOLOGIES:
@@ -105,8 +119,7 @@ def start(system, scenario='legacy', topology='diamond4', repetition=None, campa
     if campaign_id is not None and (not isinstance(campaign_id, str)
             or not re.fullmatch(r'campaign-\d{8}T\d{6}-[0-9a-f]{8}', campaign_id)):
         raise ValueError('Invalid campaign identifier')
-    if system in ('predictive-safe', 'predictive-confidence', 'predictive-safe-only') and scenario == 'legacy':
-        scenario = 'ramp'
+    scenario = resolve_scenario(system, scenario)
     if scenario == 'multi-flow' and topology != 'access6':
         raise ValueError('Multi-flow traffic requires the six-switch network')
     if scenario == 'legacy' and topology != 'diamond4':

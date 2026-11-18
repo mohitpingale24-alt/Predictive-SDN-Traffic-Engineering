@@ -11,14 +11,17 @@ held-out run, pooled. Scripts: `analyze_weak.py`, `analyze_threshold.py`,
 
 | metric | Reactive | Predictive-GB | verdict |
 |---|---|---|---|
-| P95 latency | 16.675 ms, CI95 [16.570, 16.780] | 16.908 ms, CI95 [16.685, 17.130] | CIs overlap — no significant difference |
-| Avg jitter | 0.055 ms, CI95 [0.029, 0.080] | 0.309 ms, CI95 [−0.183, 0.800] | CIs overlap widely — one high-variance run, not a systematic gap |
+| P95 latency | 16.675 ms, CI95 [16.570, 16.780] | 16.908 ms, CI95 [16.685, 17.130] | CIs overlap — these data do not separate the systems on this metric |
+| Avg jitter | 0.055 ms, CI95 [0.029, 0.080] | 0.309 ms, CI95 [−0.183, 0.800] | CIs overlap widely — consistent with one high-variance run; not a demonstrated systematic gap |
 | Avg latency | 11.837 ms | 12.574 ms | sub-ms, same story |
 
 Static, for contrast: P95 125.9 ms, packet loss 11.4%, congestion 38.6 s.
 Defensible claim: *predictive control costs no measurable latency versus
-reactive control, while eliminating congestion entirely (0.000 s vs
-3.000 s) with avoidance rate 1.000 vs 0.188.*
+reactive control, while recording no sampled congestion seconds in these
+runs (0.000 s vs 3.000 s) with avoidance rate 1.000 vs 0.188.*
+Overlapping CIs are NOT evidence of equivalence: no equivalence margin
+was pre-specified and no equivalence test (e.g. TOST) was run, so the
+honest statement is "not separated by these data", never "equal".
 
 ## 2. Forecast MAE — real, structural, and honestly unbeatable here
 
@@ -47,7 +50,8 @@ reactive control, while eliminating congestion entirely (0.000 s vs
   those forecasts, so the crossing never happened. The same workload
   congested for 3.0 s under persistence/reactive control and 38.6 s
   under static. The forecast's value is measured at the system level:
-  congestion 0.000 s, avoidance 1.000, loss 0.023%, throughput equal.
+  no sampled congestion seconds, avoidance 1.000, loss 0.023%,
+  throughput equal.
 - Recalibrated GB has the best RMSE of any forecaster tested (21.25) —
   if a single point-forecast number must be quoted, quote RMSE with the
   MAE caveat attached, never MAE alone and never GB-superiority on MAE.

@@ -1,12 +1,20 @@
 #cloud-config
+# Access model: this guest is driven entirely through the 9p repo
+# mount and its console; nothing in the automation logs in over SSH or
+# with a password. The account therefore has a LOCKED password and
+# password authentication is disabled — earlier revisions minted the
+# VM with a plaintext password equal to the username, which must never
+# be used for a new image (historical copies remain only inside
+# committed calibration artifacts, as records of how those VMs were
+# actually built).
+ssh_pwauth: false
 users:
   - default
   - name: mohit
     groups: [adm, sudo]
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
-    lock_passwd: false
-    plain_text_passwd: mohit
+    lock_passwd: true
 write_files:
   - path: /usr/local/sbin/provision-sdn-evaluation
     owner: root:root

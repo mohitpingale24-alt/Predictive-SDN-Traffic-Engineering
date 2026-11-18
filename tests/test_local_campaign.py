@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from experiments import run_local_campaign as campaign
+from experiments.scenarios import PRIMARY_SYSTEMS
 
 
 class Clock:
@@ -78,22 +79,22 @@ class LocalCampaignTests(unittest.TestCase):
         return campaign.execute_campaign(directory, runtime=runtime, clock=clock.now,
                                          sleep=clock.sleep, logger=lambda _message: None, **kwargs)
 
-    def test_plan_is_read_only_and_has_105_default_experiments(self):
+    def test_plan_is_read_only_and_covers_all_primary_systems(self):
         with tempfile.TemporaryDirectory() as temporary, patch.object(campaign.live_runtime, "LIVE", Path(temporary) / "absent"), \
              patch.object(campaign.live_runtime, "start") as start, \
              patch.object(campaign, "source_fingerprint") as fingerprint, \
              patch("sys.stdout", new_callable=io.StringIO) as output:
             self.assertEqual(campaign.main(["--plan"]), 0)
             payload = json.loads(output.getvalue())
-            self.assertEqual(payload["experiments"], 105)
-            self.assertEqual(payload["traffic_seconds"], 105 * 90)
+            self.assertEqual(payload["experiments"], 7 * 3 * len(PRIMARY_SYSTEMS))
+            self.assertEqual(payload["traffic_seconds"], 7 * 3 * len(PRIMARY_SYSTEMS) * 90)
             self.assertFalse((Path(temporary) / "absent").exists())
             start.assert_not_called()
             fingerprint.assert_not_called()
 
     def test_matched_subset_and_larger_topology(self):
         plan = campaign.build_plan(3, ["ramp", "multi-flow"], "access6")
-        self.assertEqual(len(plan), 30)
+        self.assertEqual(len(plan), 2 * 3 * len(PRIMARY_SYSTEMS))
         self.assertEqual({item["topology"] for item in plan}, {"access6"})
         self.assertEqual({item["repetition"] for item in plan}, {1, 2, 3})
         with self.assertRaisesRegex(ValueError, "Multi-flow"):
@@ -107,7 +108,7 @@ class LocalCampaignTests(unittest.TestCase):
             self.assertEqual(self.execute(directory, runtime, clock), 0)
             manifest = campaign.read_manifest(directory, runtime)
             self.assertEqual(manifest["status"], "complete")
-            self.assertEqual(len(runtime.started), 5)
+            self.assertEqual(len(runtime.started), len(PRIMARY_SYSTEMS))
             self.assertTrue(all(item["campaign_id"] == directory.name for item in runtime.started))
             self.assertTrue(all(item["status"] == "complete" and item["capture"] for item in manifest["entries"]))
 
@@ -124,7 +125,7 @@ class LocalCampaignTests(unittest.TestCase):
             runtime.status_sequence = ["running", "complete"]
             self.assertEqual(self.execute(directory, runtime, clock, resume=True), 0)
             after = campaign.read_manifest(directory, runtime)
-            self.assertEqual(len(runtime.started), 6)
+            self.assertEqual(len(runtime.started), len(PRIMARY_SYSTEMS) + 1)
             self.assertEqual(len(after["entries"][0]["attempts"]), 2)
             self.assertEqual(after["entries"][0]["attempts"][0]["status"], "failed")
 

@@ -45,15 +45,33 @@ def main():
     if missing:
         raise SystemExit("Dataset is missing columns: %s" % missing)
     quantiles = tuple(float(q) for q in args.quantiles.split(","))
+    split_method = "row order (dataset carries no timestamps)"
+    purged = 0
+    if "timestamp" in frame.columns:
+        # Genuinely chronological: the prepared dataset is grouped by
+        # link, so file order is not time order.
+        frame = frame.sort_values("timestamp", kind="stable").reset_index(drop=True)
+        split_method = "chronological by timestamp"
     X = frame[features].to_numpy(dtype=float)
     y = frame[args.target].to_numpy(dtype=float)
     split = int(len(frame) * 0.7)
-    X_train, X_test, y_train, y_test = X[:split], X[split:], y[:split], y[split:]
+    train_rows = list(range(split))
+    if "timestamp" in frame.columns and "target_timestamp" in frame.columns:
+        # Embargo: training rows whose target falls inside the test
+        # period leak future labels across the split boundary.
+        test_start = frame["timestamp"].iloc[split]
+        target_stamps = frame["target_timestamp"].to_numpy()
+        train_rows = [i for i in train_rows if target_stamps[i] < test_start]
+        purged = split - len(train_rows)
+        split_method += " with horizon embargo"
+    X_train, y_train = X[train_rows], y[train_rows]
+    X_test, y_test = X[split:], y[split:]
 
     gbdt = train_gbdt_quantiles(X_train, y_train, quantiles)
     linear = LinearQuantileRegressor(quantiles).fit(X_train, y_train)
     report = dict(features=features, target=args.target, quantiles=list(quantiles),
-                  train_rows=int(split), test_rows=int(len(y_test)),
+                  split_method=split_method, boundary_purged_rows=int(purged),
+                  train_rows=int(len(y_train)), test_rows=int(len(y_test)),
                   gbdt={str(q): dict(pinball_loss=round(pinball_loss(y_test, gbdt[q].predict(X_test), q), 4))
                         for q in quantiles},
                   linear={str(q): dict(pinball_loss=round(pinball_loss(y_test, linear.predict(X_test, q), q), 4))

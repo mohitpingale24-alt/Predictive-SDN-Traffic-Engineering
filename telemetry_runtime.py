@@ -162,7 +162,7 @@ class PortRateTracker:
 class FeatureHistory:
 	"""Build the exact lag and rolling features used by tabular models."""
 
-	def __init__(self, max_history=11, require_contiguous=False):
+	def __init__(self, max_history=11, require_contiguous=True):
 		if max_history < 11:
 			raise ValueError("max_history must retain at least 11 samples")
 		self._history = defaultdict(lambda: deque(maxlen=max_history))
@@ -173,8 +173,9 @@ class FeatureHistory:
 		if missing:
 			raise ValueError(f"Missing telemetry fields: {missing}")
 		link_history = self._history[str(sample["link_id"])]
-		# Opt-in for new research runs. Do not treat rows across a missing or
-		# duplicate integer-second sample as one-second lag observations.
+		# Lag features are one-second lags: rows across a missing or
+		# duplicate integer-second sample must never pose as one-second
+		# lag observations, so a gap restarts the history by default.
 		if (self.require_contiguous and link_history
 				and int(sample["timestamp"]) != int(link_history[-1]["timestamp"]) + 1):
 			link_history.clear()

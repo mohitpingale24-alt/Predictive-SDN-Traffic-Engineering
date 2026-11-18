@@ -2,10 +2,10 @@
   "method": "split_conformal_absolute_residual",
   "alpha": 0.09999999999999998,
   "nominal_coverage": 0.9,
-  "radius_percentage_points": 38.5118,
+  "radius_percentage_points": 26.8018,
   "aci": {
     "gamma": 0.01,
-    "initial_radius_percentage_points": 38.5118,
+    "initial_radius_percentage_points": 26.8018,
     "scores": [
       14.8859,
       7.8252,
@@ -109,87 +109,52 @@
       9.438,
       9.4252,
       9.468,
-      7.8252,
-      9.393,
-      7.8252,
-      18.6568,
-      7.9033,
-      13.6115,
-      7.8252,
-      13.6305,
-      9.4252,
-      13.6075,
-      9.4252,
-      13.7545,
-      9.4252,
-      13.5725,
-      9.4252,
-      13.6985,
-      9.4252,
-      13.6155,
-      9.4252,
-      13.7335,
-      9.4252,
-      14.3985,
-      9.4252,
-      26.6407,
-      9.4252,
-      27.4585,
-      9.4252,
-      28.8035,
-      41.3828,
-      51.5635,
-      42.0828,
-      52.4407,
-      42.0228,
-      9.6313,
-      41.9788,
-      8.0076,
-      42.0248,
-      7.4782,
-      3.9163,
-      2.5681,
-      5.7306,
-      2.49,
-      5.1945,
-      2.49,
-      5.2065,
-      2.212,
-      5.1675,
-      2.212,
-      4.651,
-      2.212,
-      5.4391,
-      7.8252,
-      0.6331,
-      7.8252,
-      10.6731,
-      7.8252,
-      5.4281,
-      7.8252,
-      11.2258,
-      9.4252,
-      13.2552,
-      9.4252,
-      40.3052,
-      9.4252,
-      40.2982,
-      9.5033,
-      40.2972,
-      9.4252,
-      40.3052,
-      9.4252
-    ]
+      7.8252
+    ],
+    "heldout_coverage": {
+      "n": 69,
+      "coverage": 0.8551,
+      "mean_width": 54.9797
+    }
   },
-  "calibration_rows": 172,
-  "empirical_coverage_on_calibration": {
-    "n": 172,
-    "coverage": 0.907,
-    "mean_width": 59.8573
+  "calibration_rows": 103,
+  "heldout_rows": 69,
+  "heldout_coverage": {
+    "n": 69,
+    "coverage": 0.8116,
+    "mean_width": 43.4658
   },
   "provenance": {
     "capture": "final-evaluation-artifacts/campaign-02/predictive-ml/run-01",
     "horizon_seconds": 5,
-    "pairing": "exact timestamp + horizon in telemetry.csv"
+    "pairing": "exact timestamp + horizon in telemetry.csv",
+    "split": "chronological: first 60% calibrate, rest held out",
+    "eval_capture": "final-evaluation-artifacts/campaign-02/predictive-ml/run-02"
+  },
+  "calibration_ranges": {
+    "prediction": [
+      2.212,
+      87.0352
+    ],
+    "actual": [
+      0.0,
+      76.576
+    ]
+  },
+  "gate_diagnostics": {
+    "threshold": 85.0,
+    "max_lower_bound": 73.1982,
+    "gate_can_activate": false
+  },
+  "model_binding": {
+    "model_file": "cnt-ml/models/gbdt_portable.json",
+    "model_sha256": "ff62cfefde45b200b90d3c8ce5a52c764260804a2f3e36b6323978cc3c71a57d",
+    "feature_schema_file": "cnt-ml/models/feature_list.json",
+    "feature_schema_sha256": "e4f225fc32efea36621c3830bc57e441b782e3935bb7aae19dfff8f16120ceb1"
+  },
+  "eval_capture_coverage": {
+    "n": 174,
+    "coverage": 0.8621,
+    "mean_width": 43.3245
   }
 }

@@ -1,0 +1,12 @@
+# Dashboard, analysis and unit tests — the reproducible core.
+# Deliberately excludes the controller stack (ryu/eventlet): those pins
+# only install on the experiment VM's Python (see
+# requirements-controller-verified.txt) and nothing in the dashboard,
+# the analysis scripts or the test suite imports them.
+numpy
+pandas
+scipy
+scikit-learn
+joblib
+matplotlib
+xgboost

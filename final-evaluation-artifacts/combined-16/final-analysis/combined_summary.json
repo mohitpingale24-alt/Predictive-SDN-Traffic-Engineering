@@ -1,0 +1,199 @@
+{
+  "forecast": {
+    "label": "campaign-02 + campaign-03 predictive-ml",
+    "samples": 2736,
+    "persistence_mae": 10.896,
+    "gb_mae": 14.775,
+    "persistence_rmse": 22.985,
+    "gb_rmse": 22.12,
+    "dm_mean_squared_loss_diff": 39.01,
+    "dm_statistic": 2.945,
+    "dm_p_value": 0.0032,
+    "gb_squared_loss_wins": "8/8",
+    "sign_test_p": 0.0078
+  },
+  "system_metrics_n16": {
+    "reactive/Congestion_Duration_seconds": {
+      "n": 16,
+      "mean": 3.0,
+      "ci95": [
+        3.0,
+        3.0
+      ],
+      "campaign02_mean": 3.0,
+      "campaign02_ci95": [
+        3.0,
+        3.0
+      ]
+    },
+    "reactive/Congestion_Events": {
+      "n": 16,
+      "mean": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ],
+      "campaign02_mean": 1.0,
+      "campaign02_ci95": [
+        1.0,
+        1.0
+      ]
+    },
+    "reactive/P95_Latency_ms": {
+      "n": 16,
+      "mean": 16.67625,
+      "ci95": [
+        16.600986294869998,
+        16.75151370513
+      ],
+      "campaign02_mean": 16.675,
+      "campaign02_ci95": [
+        16.569707213057388,
+        16.780292786942614
+      ]
+    },
+    "reactive/Average_Latency_ms": {
+      "n": 16,
+      "mean": 11.846140463917525,
+      "ci95": [
+        11.767431256333767,
+        11.924849671501283
+      ],
+      "campaign02_mean": 11.836636597938144,
+      "campaign02_ci95": [
+        11.78524396440923,
+        11.888029231467058
+      ]
+    },
+    "reactive/Average_Jitter_ms": {
+      "n": 16,
+      "mean": 0.061162806107369086,
+      "ci95": [
+        0.03948108769463864,
+        0.08284452452009952
+      ],
+      "campaign02_mean": 0.05452631019990234,
+      "campaign02_ci95": [
+        0.029097355204671986,
+        0.07995526519513269
+      ]
+    },
+    "reactive/Average_Packet_Loss_pct": {
+      "n": 16,
+      "mean": 0.00030591268028453956,
+      "ci95": [
+        -0.00034598724140181414,
+        0.0009578126019708932
+      ],
+      "campaign02_mean": 0.0006118253605690791,
+      "campaign02_ci95": [
+        -0.000835141617176793,
+        0.0020587923383149514
+      ]
+    },
+    "reactive/Congestion_Avoidance_Rate": {
+      "n": 16,
+      "mean": 0.25,
+      "ci95": [
+        0.1124445414871999,
+        0.3875554585128001
+      ],
+      "campaign02_mean": 0.1875,
+      "campaign02_ci95": [
+        -0.02887534429905758,
+        0.4038753442990576
+      ]
+    },
+    "predictive-ml/Congestion_Duration_seconds": {
+      "n": 16,
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "campaign02_mean": 0.0,
+      "campaign02_ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    "predictive-ml/Congestion_Events": {
+      "n": 16,
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "campaign02_mean": 0.0,
+      "campaign02_ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    "predictive-ml/P95_Latency_ms": {
+      "n": 16,
+      "mean": 16.7725,
+      "ci95": [
+        16.64464739951967,
+        16.900352600480332
+      ],
+      "campaign02_mean": 16.907500000000002,
+      "campaign02_ci95": [
+        16.684576682837303,
+        17.130423317162702
+      ]
+    },
+    "predictive-ml/Average_Latency_ms": {
+      "n": 16,
+      "mean": 12.426675257731958,
+      "ci95": [
+        12.214993284905212,
+        12.638357230558704
+      ],
+      "campaign02_mean": 12.574110824742268,
+      "campaign02_ci95": [
+        12.12803339008388,
+        13.020188259400657
+      ]
+    },
+    "predictive-ml/Average_Jitter_ms": {
+      "n": 16,
+      "mean": 0.17946438693619032,
+      "ci95": [
+        -0.04597789065250926,
+        0.4049066645248899
+      ],
+      "campaign02_mean": 0.3085673659370956,
+      "campaign02_ci95": [
+        -0.1829417018332909,
+        0.8000764337074822
+      ]
+    },
+    "predictive-ml/Average_Packet_Loss_pct": {
+      "n": 16,
+      "mean": 0.011726652744240684,
+      "ci95": [
+        -0.00573025937054655,
+        0.029183564859027917
+      ],
+      "campaign02_mean": 0.023453305488481367,
+      "campaign02_ci95": [
+        -0.013814148747383848,
+        0.06072075972434658
+      ]
+    },
+    "predictive-ml/Congestion_Avoidance_Rate": {
+      "n": 16,
+      "mean": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ],
+      "campaign02_mean": 1.0,
+      "campaign02_ci95": [
+        1.0,
+        1.0
+      ]
+    }
+  }
+}

@@ -89,7 +89,13 @@ class ExperimentAnalysisTests(unittest.TestCase):
 				rows = list(csv.DictReader(handle))
 			self.assertEqual([row["timestamp"] for row in rows], ["0", "1"])
 			self.assertEqual([row["delay"] for row in rows], ["4.5", "5.5"])
-			self.assertEqual([row["packet_loss"] for row in rows], ["1.25", "1.25"])
+			# Both rows fall INSIDE the only iperf segment (100-102).
+			# A segment's lost_percent is its whole-segment summary and
+			# does not exist until the segment ends, so causal rows
+			# cannot carry it (that was future leakage); they fall back
+			# to the OpenFlow drop counters (0 here). See
+			# prepare_real_dataset.iperf_completed_at.
+			self.assertEqual([row["packet_loss"] for row in rows], ["0.0", "0.0"])
 			self.assertNotIn("queue_occupancy", rows[0])
 			self.assertTrue((run_dir / "sampling_gaps.json").exists())
 			second = subprocess.run(

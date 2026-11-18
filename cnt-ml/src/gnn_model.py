@@ -41,14 +41,16 @@ def normalized_adjacency(adjacency):
     return inverse_sqrt @ with_self @ inverse_sqrt
 
 
-def build_dataset(telemetry_csv, horizon_steps=5):
+def build_dataset(telemetry_csv, horizon_steps=5, return_stamps=False):
     """Align per-link telemetry into graph snapshots.
 
     Features per link-node: utilization, throughput, packet_loss,
     utilization lag-1, and a 5-sample utilization mean — all computed from
-    the recorded series. The target is the link's utilization
-    ``horizon_steps`` samples later. Returns (X, Y, link_ids) with X of
-    shape (snapshots, links, features).
+    the recorded series. The target is the link's utilization at exactly
+    ``horizon_steps`` seconds later. Returns (X, Y, link_ids) with X of
+    shape (snapshots, links, features); with return_stamps=True it also
+    returns each snapshot's timestamp, so callers can purge training
+    snapshots whose targets fall inside the test period.
     """
     series = {}
     with open(telemetry_csv, newline="", encoding="utf-8") as handle:
@@ -68,35 +70,39 @@ def build_dataset(telemetry_csv, horizon_steps=5):
     stamps = sorted(common or [])
     if len(stamps) < 20:
         raise ValueError("Not enough aligned telemetry snapshots for a GNN dataset")
-    index = {link_id: {stamp: i for i, stamp in enumerate(sorted(series[link_id]))}
-             for link_id in link_ids}
-    ordered = {link_id: [series[link_id][stamp] for stamp in sorted(series[link_id])]
-               for link_id in link_ids}
-    features, targets = [], []
-    for position, stamp in enumerate(stamps):
+    # Windows are looked up by timestamp, never by row position: the
+    # 5-sample history must be stamps s-4..s and the target the sample at
+    # exactly s + horizon_steps. A sampling gap — or the seam where
+    # pooled telemetry joins two runs — makes the snapshot incomplete
+    # instead of silently borrowing rows from the wrong time or run.
+    features, targets, kept_stamps = [], [], []
+    for stamp in stamps:
         snapshot = []
         complete = True
         for link_id in link_ids:
-            rows = ordered[link_id]
-            pos = index[link_id][stamp]
-            if pos < 5 or pos + horizon_steps >= len(rows):
+            rows = series[link_id]
+            if any((stamp - k) not in rows for k in range(5)) \
+                    or (stamp + horizon_steps) not in rows:
                 complete = False
                 break
-            history = [rows[pos - k][0] for k in range(5)]
-            util, throughput, loss = rows[pos]
+            history = [rows[stamp - k][0] for k in range(5)]
+            util, throughput, loss = rows[stamp]
             snapshot.append([util, throughput, loss, history[1],
                              sum(history) / len(history)])
         if not complete:
             continue
-        target = []
-        for link_id in link_ids:
-            rows = ordered[link_id]
-            target.append([rows[index[link_id][stamp] + horizon_steps][0]])
+        target = [[series[link_id][stamp + horizon_steps][0]]
+                  for link_id in link_ids]
         features.append(snapshot)
         targets.append(target)
+        kept_stamps.append(stamp)
     if len(features) < 10:
         raise ValueError("Not enough complete snapshots after alignment")
-    return np.asarray(features, dtype=float), np.asarray(targets, dtype=float), link_ids
+    X = np.asarray(features, dtype=float)
+    Y = np.asarray(targets, dtype=float)
+    if return_stamps:
+        return X, Y, link_ids, kept_stamps
+    return X, Y, link_ids
 
 
 class GCNForecaster:
@@ -105,17 +111,31 @@ class GCNForecaster:
         scale1 = math.sqrt(2.0 / n_features)
         scale2 = math.sqrt(2.0 / hidden)
         self.W1 = rng.normal(0, scale1, size=(n_features, hidden))
+        # Residual self-projection: each node's own features reach the
+        # hidden layer unmixed. Without it, a fully-connected 2-node
+        # line graph has normalized adjacency [[.5,.5],[.5,.5]], the
+        # first convolution averages the two links into one vector, and
+        # the model emits IDENTICAL predictions for both links no
+        # matter how different their inputs are.
+        self.W0 = rng.normal(0, scale1, size=(n_features, hidden))
         self.b1 = np.zeros(hidden)
         self.W2 = rng.normal(0, scale2, size=(hidden, 1))
+        # Output-layer self projection: the second convolution mixes
+        # hidden states across nodes exactly like the first, so node
+        # identity needs an unmixed path at this layer too.
+        self.W2s = rng.normal(0, scale2, size=(hidden, 1))
         self.b2 = np.zeros(1)
+        self.meta = {}
         self._adam = {}
 
     def _forward(self, graph, X):
         GX = np.einsum("nm,tmf->tnf", graph, X)
-        Z1 = np.einsum("tnf,fh->tnh", GX, self.W1) + self.b1
+        Z1 = (np.einsum("tnf,fh->tnh", GX, self.W1)
+              + np.einsum("tnf,fh->tnh", X, self.W0) + self.b1)
         H = np.maximum(Z1, 0.0)
         GH = np.einsum("nm,tmh->tnh", graph, H)
-        Y = np.einsum("tnh,ho->tno", GH, self.W2) + self.b2
+        Y = (np.einsum("tnh,ho->tno", GH, self.W2)
+             + np.einsum("tnh,ho->tno", H, self.W2s) + self.b2)
         return Y, (GX, Z1, H, GH)
 
     def predict(self, graph, X):
@@ -140,26 +160,53 @@ class GCNForecaster:
             losses.append(float(np.mean(error ** 2)))
             dY = 2.0 * error / error.size
             dW2 = np.einsum("tnh,tno->ho", GH, dY)
+            dW2s = np.einsum("tnh,tno->ho", H, dY)
             db2 = dY.sum(axis=(0, 1))
             dGH = np.einsum("tno,ho->tnh", dY, self.W2)
-            dH = np.einsum("nm,tmh->tnh", graph, dGH)
+            dH = (np.einsum("nm,tmh->tnh", graph, dGH)
+                  + np.einsum("tno,ho->tnh", dY, self.W2s))
             dZ1 = dH * (Z1 > 0)
             dW1 = np.einsum("tnf,tnh->fh", GX, dZ1)
+            dW0 = np.einsum("tnf,tnh->fh", X, dZ1)
             db1 = dZ1.sum(axis=(0, 1))
             self.W1 = self._adam_step("W1", self.W1, dW1, lr, step)
+            self.W0 = self._adam_step("W0", self.W0, dW0, lr, step)
             self.b1 = self._adam_step("b1", self.b1, db1, lr, step)
             self.W2 = self._adam_step("W2", self.W2, dW2, lr, step)
+            self.W2s = self._adam_step("W2s", self.W2s, dW2s, lr, step)
             self.b2 = self._adam_step("b2", self.b2, db2, lr, step)
         return losses
 
-    def save(self, path):
-        np.savez(path, W1=self.W1, b1=self.b1, W2=self.W2, b2=self.b2)
+    def save(self, path, meta=None):
+        # The artifact must be self-describing: the normalization the
+        # model was trained under, the link order its node axis follows
+        # and the forecast horizon are part of the model. Previously
+        # they lived only in the training script's report, so a loaded
+        # model could be fed raw, wrongly-ordered inputs with no way
+        # to detect the mismatch.
+        payload = dict(W1=self.W1, W0=self.W0, b1=self.b1,
+                       W2=self.W2, W2s=self.W2s, b2=self.b2)
+        combined = dict(self.meta)
+        if meta:
+            combined.update(meta)
+        if combined:
+            import json
+            payload["meta_json"] = np.asarray(json.dumps(combined))
+        np.savez(path, **payload)
 
     @classmethod
     def load(cls, path):
         data = np.load(path)
         model = cls(data["W1"].shape[0], hidden=data["W1"].shape[1])
         model.W1, model.b1, model.W2, model.b2 = data["W1"], data["b1"], data["W2"], data["b2"]
+        # Artifacts saved before the residual projections existed get
+        # ZERO projections, reproducing their original function exactly
+        # rather than the random init from __init__.
+        model.W0 = data["W0"] if "W0" in data else np.zeros_like(model.W0)
+        model.W2s = data["W2s"] if "W2s" in data else np.zeros_like(model.W2s)
+        if "meta_json" in data:
+            import json
+            model.meta = json.loads(str(data["meta_json"]))
         return model
 
 
